@@ -1,0 +1,18 @@
+package crypto
+
+import (
+	"crypto/sha256"
+)
+
+const (
+	// HashLen is the length of SHA256 output in bytes [32]
+	HashLen = sha256.Size
+)
+
+// Hash is a fixed sized array type holding bytes of hash
+type Hash [HashLen]byte
+
+// DoHash takes bytes and outputs a 32 byte array
+func DoHash(bytes []byte) Hash {
+	return sha256.Sum256(bytes)
+}
