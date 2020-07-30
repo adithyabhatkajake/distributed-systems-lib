@@ -1,0 +1,15 @@
+syntax = "proto3" ;
+package proposal ;
+
+option go_package = "github.com/adithyabhatkajake/libe2c/consensus/e2c/msg" ;
+
+import "proto/e2c/command.proto" ;
+
+// All configuration aggregated here
+message Proposal {
+	// A proposal contains the following
+	repeated command.Command cmds = 1 ;
+	uint64 proposer = 2 ;
+	bytes signature = 3 ;
+}
+

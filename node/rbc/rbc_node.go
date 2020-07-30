@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/adithyabhatkajake/libe2c/config"
-	"github.com/adithyabhatkajake/libe2c/consensus"
+	"github.com/adithyabhatkajake/libe2c/consensus/rbc"
 	"github.com/adithyabhatkajake/libe2c/io"
 	"github.com/adithyabhatkajake/libe2c/net"
 )
@@ -31,7 +31,7 @@ func main() {
 	fmt.Println("Finished connection to all the nodes")
 
 	// Configure RBC protocol
-	r := &consensus.RBC{}
+	r := &rbc.RBC{}
 	r.Init(config)
 	r.Setup(netw)
 

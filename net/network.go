@@ -74,7 +74,7 @@ func Setup(nodeConf *config.NodeConfig) *Network {
 	return net
 }
 
-// Connect connects to all the peers.
+// Connect connects to all the peers in parallel.
 // Ensure that Setup is called before calling this
 func (n *Network) Connect() {
 	wg := &sync.WaitGroup{}
