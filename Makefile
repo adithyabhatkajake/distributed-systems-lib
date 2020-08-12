@@ -1,35 +1,25 @@
-PROTO_PATH=/home/haxolotl/go/src/github.com/adithyabhatkajake/libe2c
-GO_OUT_DIR=/home/haxolotl/go/src/
+.PHONY: proto tools
 
-# Reference on how to use $^, $? and other automatic variables
-# https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html
+# Update all protocol buffers
+proto:
+	make -C proto/
 
-# Build all the protobuf files
-proto: proto/config.proto \
-	proto/crypto.proto \
-	proto/e2c.proto \
-	proto/net.proto \
-	proto/e2c/blame.proto \
-	proto/e2c/command.proto \
-	proto/e2c/generic.proto \
-	proto/e2c/proposal.proto
-	@echo "Using Proto Path: ${PROTO_PATH}"
-	@echo "Using Go Out Directory: ${GO_OUT_DIR}"
-	# Build only changed protobuf definitions
-	# Compiling Protobuf tips
-	# https://jbrandhorst.com/post/go-protobuf-tips/
-	protoc $? -I${PROTO_PATH} --go_out=:${GO_OUT_DIR}
+# Build all the tools
+alltools: 
+	make -C tools/e2c/
 
-gen-config: tools/genConfig.go
-	go build -o tools/genConfig $^
+# Build all the nodes
+allnodes:
+	make -C node/
 
-gen-test-data: gen-config
-	@echo "TODO: Generate a config for 10 nodes in testData directory"
-	@echo "TODO: Generate a config for 3 nodes in testData directory"
+allclients:
+	make -C client/
 
-rbc-replica: node/rbc/rbc_node.go
-	go build -o node/rbc/rbc_replica $^
+testfiles: 
+	make -C tools/e2c testfiles
 
 clean:
-	@rm -rf tools/genConfig
-	@rm -rf node/rbc/rbc_replica
+	@make -C proto/ clean
+	@make -C node/ clean
+	@make -C tools/e2c clean
+	@make -C client/ clean

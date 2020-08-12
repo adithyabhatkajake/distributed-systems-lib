@@ -1,0 +1,20 @@
+syntax = "proto3" ;
+package config ;
+
+option go_package = "github.com/adithyabhatkajake/libe2c/config/e2c" ;
+
+import "crypto.proto" ;
+import "e2c/config/protocol.proto" ;
+import "net.proto" ;
+
+// All configuration aggregated here
+message NodeDataConfig {
+	// Protocol specific configuration
+	E2CConfig ProtConfig = 1 ;
+	// Network configuration for nodes
+	NetConfig NetConfig = 2 ;
+	// Network configuration for clients
+	NetConfig ClientNetConfig = 3 ;
+	// Cryptographic configuration
+	CryptoConfig CryptoCon = 4 ;
+}

@@ -9,6 +9,7 @@ require (
 	github.com/joho/godotenv v1.3.0
 	github.com/libp2p/go-libp2p v0.10.0
 	github.com/libp2p/go-libp2p-core v0.6.0
+	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/pborman/getopt v0.0.0-20190409184431-ee0cd42419d3
 	github.com/stretchr/testify v1.6.1

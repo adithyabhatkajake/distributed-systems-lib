@@ -22,7 +22,7 @@ func TestHash(t *testing.T) {
 	testStringInBytes := util.StringToByte(str)
 	computedHash := crypto.DoHash(testStringInBytes)
 	expectedHashBytes := util.HexStringToByte(expStr) // []byte
-	var expectedHash crypto.Hash
+	var expectedHash crypto.Hash = make([]byte, crypto.HashLen)
 	copy(expectedHash[:], expectedHashBytes) // Now it is [32]byte
 	require.Equal(t, len(computedHash), len(expectedHash))
 	require.Equal(t, len(computedHash), crypto.HashLen)

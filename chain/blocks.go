@@ -1,30 +1,26 @@
 package chain
 
 import (
-	"sync"
+	"bytes"
 
 	"github.com/adithyabhatkajake/libe2c/crypto"
+	pb "github.com/golang/protobuf/proto"
 )
 
-// Block Data Structure
-type Block struct {
-	Index     uint64
-	BlockHash crypto.Hash
-	PrevHash  crypto.Hash
-	Decision  bool
-	Proposer  uint64
-	cmds      []crypto.Hash // Array of Hashes
+// GetHash computes the hash from the block data
+func (b *Block) GetHash() crypto.Hash {
+	data, err := pb.Marshal(b.Data)
+	if err != nil {
+		panic(err)
+	}
+	return crypto.DoHash(data)
 }
 
-type void struct{}
-
-// BlockChain is what we call a blockchain
-type BlockChain struct {
-	Chain map[[crypto.HashLen]byte]Block
-	// A lock that we use to safely update the chain
-	ChainLock sync.Mutex
-	// A height block map
-	HeightBlockMap map[uint64]Block
-	// Unconfirmed Blocks
-	UnconfirmedBlocks map[crypto.Hash]void
+// IsValid checks if the block is valid
+func (b *Block) IsValid() bool {
+	// Check if the hash is correctly computed
+	if !bytes.Equal(b.GetHash(), b.BlockHash) {
+		return false
+	}
+	return true
 }

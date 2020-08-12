@@ -1,0 +1,17 @@
+syntax = "proto3" ;
+package msg ;
+
+option go_package = "github.com/adithyabhatkajake/libe2c/msg/e2c" ;
+
+import "e2c/msg/proposal.proto" ;
+import "e2c/msg/blame.proto" ;
+import "e2c/msg/command.proto" ;
+
+message E2CMsg {
+    oneof Msg {
+        msg.Proposal Prop = 1 ;
+        msg.NoProgressBlame Npblame = 2 ;
+        msg.EquivocationBlame Eqblame = 3 ;
+        msg.Command Cmd = 4 ;
+    }
+}

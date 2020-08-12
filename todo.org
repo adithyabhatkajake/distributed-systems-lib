@@ -50,3 +50,8 @@
 ** [/] ProtoBuf
 
 ** [/] Consensus
+
+- Config
+    - Add list of client's identities to accept connections from
+    - Add a seperate port in clientconfig where to contact the nodes
+    - Add a seperate port in nodeconfig where to talk to clients

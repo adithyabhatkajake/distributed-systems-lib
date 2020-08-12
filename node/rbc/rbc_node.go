@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/adithyabhatkajake/libe2c/config"
+	e2cconfig "github.com/adithyabhatkajake/libe2c/config/e2c"
 	"github.com/adithyabhatkajake/libe2c/consensus/rbc"
 	"github.com/adithyabhatkajake/libe2c/io"
 	"github.com/adithyabhatkajake/libe2c/net"
@@ -18,13 +18,13 @@ var (
 
 func main() {
 	fmt.Println("I am the replica.")
-	config := &config.NodeConfig{}
+	config := &e2cconfig.NodeConfig{}
 
 	io.ReadFromFile(config, os.Args[1])
 	fmt.Println("Finished reading the config file", os.Args[1])
 
 	// Setup connections
-	netw := net.Setup(config)
+	netw := net.Setup(config, config, config)
 
 	// Connect and send a test message
 	netw.Connect()

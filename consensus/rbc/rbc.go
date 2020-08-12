@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/adithyabhatkajake/libe2c/config"
+	config "github.com/adithyabhatkajake/libe2c/config/e2c"
 	"github.com/adithyabhatkajake/libe2c/net"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"

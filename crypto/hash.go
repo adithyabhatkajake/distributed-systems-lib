@@ -14,5 +14,16 @@ type Hash [HashLen]byte
 
 // DoHash takes bytes and outputs a 32 byte array
 func DoHash(bytes []byte) Hash {
-	return sha256.Sum256(bytes)
+	h := sha256.Sum256(bytes)
+	return h
+}
+
+// GetBytes returns []byte
+func (h Hash) GetBytes() []byte {
+	return h[:]
+}
+
+func ToHash(b []byte) {
+	var h Hash
+	copy(h[:], b[0:HashLen])
 }

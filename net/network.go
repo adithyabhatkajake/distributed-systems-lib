@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adithyabhatkajake/libe2c/config"
+	"github.com/adithyabhatkajake/libe2c/crypto"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -38,30 +39,30 @@ type Network struct {
 
 // Setup function sets up connection with all the nodes
 // Setup needs to start listening on its port and try connecting to other nodes
-func Setup(nodeConf *config.NodeConfig) *Network {
+func Setup(c config.Config, nc Conf, cryptoc crypto.Config) *Network {
 	var err error
 	ctx := context.Background()
 	net := &Network{}
 	net.Ctx, net.CancelFunc = context.WithCancel(ctx)
-	myID := nodeConf.Config.ProtConfig.Id
+	myID := nc.GetID()
 	net.H, err = libp2p.New(net.Ctx,
-		libp2p.ListenAddrStrings(
-			nodeConf.Config.NetConfig.NodeAddressMap[myID].GetP2PAddr()),
-		libp2p.Identity(nodeConf.PvtKey),
+		libp2p.ListenAddrStrings(nc.GetP2PAddrFromID(myID)),
+		libp2p.Identity(cryptoc.GetMyKey()),
 	)
 	if err != nil {
 		panic(err)
 	}
+	numNodes := c.GetNumNodes()
 	peerMap := make(map[uint64]*peerstore.AddrInfo)
-	for idx, Addr := range nodeConf.Config.NetConfig.NodeAddressMap {
+	for idx := uint64(0); idx < numNodes; idx++ {
 		if idx == myID {
 			continue
 		}
-		peerID, err := peerstore.IDFromPublicKey(nodeConf.NodeKeyMap[idx])
+		peerID, err := peerstore.IDFromPublicKey(cryptoc.GetPubKeyFromID(idx))
 		if err != nil {
 			panic(err)
 		}
-		addr, err := ma.NewMultiaddr(Addr.GetP2PAddr())
+		addr, err := ma.NewMultiaddr(nc.GetP2PAddrFromID(idx))
 		if err != nil {
 			panic(err)
 		}
@@ -90,6 +91,7 @@ func (n *Network) connectPeer(wg *sync.WaitGroup, p *peerstore.AddrInfo) {
 	var err error
 	t, _ := time.ParseDuration(RetryWaitDuration)
 	for i := 0; i < RetryLimit; i++ {
+		fmt.Println("Attempting connection to", *p)
 		err = n.H.Connect(n.Ctx, *p)
 		if err != nil {
 			fmt.Println("Connection Failed. Retrying Attempt #", i)

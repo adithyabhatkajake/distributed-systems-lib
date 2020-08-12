@@ -1,9 +1,0 @@
-syntax = "proto3" ;
-package command ;
-
-option go_package = "github.com/adithyabhatkajake/libe2c/consensus/e2c/msg" ;
-
-message Command {
-	bytes cmd = 1;
-	bytes clientsig = 2 ;
-}
