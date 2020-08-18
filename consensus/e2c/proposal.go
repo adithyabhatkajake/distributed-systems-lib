@@ -161,9 +161,15 @@ func (e *E2C) handleProposal(prop *msg.Proposal) {
 	// All parents are delivered, lets break out!!
 	fmt.Println("All parents are delivered")
 
+	relayMsg := &msg.E2CMsg{}
+	relayMsg.Msg = &msg.E2CMsg_Prop{Prop: prop}
+	e.Broadcast(relayMsg) // Relay it to all the other nodes
+	fmt.Println("Finished relaying the proposal")
 	// Start 2delta timer
 	timer := util.NewTimer(func() {
 		fmt.Println("Committing block", prop.ProposedBlock)
+		// Let the client know that we committed this block
+		// TODO
 	})
 	timer.SetTime(e.config.GetCommitWaitTime())
 	e.timerMaps[prop.ProposedBlock.Data.Index] = timer
