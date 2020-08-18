@@ -1,9 +1,9 @@
 syntax = "proto3" ;
-package block ;
+package chain ;
 
 option go_package = "github.com/adithyabhatkajake/libe2c/chain" ;
 
-import "e2c/msg/command.proto" ;
+import "e2c/chain/command.proto" ;
 
 message BlockData {
     // Index of the block
@@ -11,7 +11,7 @@ message BlockData {
     // Hash Pointer
     bytes PrevHash = 2 ;
     // commands
-    repeated msg.Command Cmds = 3 ;
+    repeated Command Cmds = 3 ;
 }
 
 message Block {
@@ -22,4 +22,6 @@ message Block {
     bool Decision = 3 ;
     // Proposer 
     uint64 Proposer = 4 ;
+    // Proposer signature
+    bytes Signature = 5 ;
 }

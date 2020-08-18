@@ -2,6 +2,7 @@ package e2c
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/adithyabhatkajake/libe2c/crypto"
 	peerstore "github.com/libp2p/go-libp2p-core/peer"
@@ -102,4 +103,20 @@ func (ec *NodeConfig) GetClientListenAddr() string {
 	address := ec.Config.ClientNetConfig.NodeAddressMap[id]
 	addr := fmt.Sprintf("/ip4/%s/tcp/%s", address.IP, address.Port)
 	return addr
+}
+
+// GetBlockSize returns the number of commands that can be inserted in one block
+func (ec *NodeConfig) GetBlockSize() uint64 {
+	return ec.Config.GetProtConfig().GetInfo().GetBlockSize()
+}
+
+// GetDelta returns the synchronous wait time
+func (ec *NodeConfig) GetDelta() time.Duration {
+	timeInSeconds := ec.Config.ProtConfig.GetDelta()
+	return time.Duration(int(timeInSeconds*1000)) * time.Millisecond
+}
+
+// GetCommitWaitTime returns how long to wait before committing a block
+func (ec *NodeConfig) GetCommitWaitTime() time.Duration {
+	return ec.GetDelta() * 2
 }

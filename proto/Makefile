@@ -10,7 +10,7 @@ all: crypto.proto \
 	e2c/config/node.proto \
 	e2c/config/protocol.proto \
 	e2c/config/client-config.proto \
-	e2c/msg/command.proto \
+	e2c/chain/command.proto \
 	e2c/msg/proposal.proto \
 	e2c/msg/blame.proto \
 	e2c/msg/generic.proto \

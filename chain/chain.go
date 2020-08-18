@@ -21,7 +21,7 @@ func NewChain() *BlockChain {
 // Commit takes a block and commits to it
 func (c *BlockChain) Commit(b *Block) error {
 	c.ChainLock.Lock()
-	c.Chain[b.GetBlockHash()]
+	// TODO do commit
 	c.ChainLock.Unlock()
 	return nil
 }

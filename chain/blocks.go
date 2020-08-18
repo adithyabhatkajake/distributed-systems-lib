@@ -16,10 +16,17 @@ func (b *Block) GetHash() crypto.Hash {
 	return crypto.DoHash(data)
 }
 
+// GetHashBytes returns crypto.Hash from []bytes
+func (b *Block) GetHashBytes() crypto.Hash {
+	var x crypto.Hash
+	copy(x[:], b.BlockHash)
+	return x
+}
+
 // IsValid checks if the block is valid
 func (b *Block) IsValid() bool {
 	// Check if the hash is correctly computed
-	if !bytes.Equal(b.GetHash(), b.BlockHash) {
+	if !bytes.Equal(b.GetHash().GetBytes(), b.BlockHash) {
 		return false
 	}
 	return true

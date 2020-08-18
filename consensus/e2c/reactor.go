@@ -15,28 +15,61 @@ func (e *E2C) react(m []byte) {
 	if err != nil {
 		panic(err)
 	}
-	switch x := inMessage.Msg.(type) {
-	case *msg.E2CMsg_Cmd:
-		fmt.Println("Got a command from client boss!")
-		cmd := inMessage.GetCmd()
-		fmt.Println("Cmd is:", string(cmd.Cmd))
-		// Add cmd to pending commands
-		// If leader, propose
-		// Self deliver a proposal
-	case nil:
-		fmt.Println("Unspecified type")
-	default:
-		fmt.Println("Unknown type", x)
-	}
-
+	e.msgChannel <- inMessage
 }
 
 func (e *E2C) protocol() {
+	// Process protocol messages
 	for {
-		msg, ok := <-e.msgChannel
+		msgIn, ok := <-e.msgChannel
 		if !ok {
 			fmt.Println("Msg channel error")
 		}
-		fmt.Println("Received msg", msg.String())
+		fmt.Println("Received msg", msgIn.String())
+		switch x := msgIn.Msg.(type) {
+		case *msg.E2CMsg_Cmd:
+			fmt.Println("Got a command from client boss!")
+			cmd := msgIn.GetCmd()
+			fmt.Println("Cmd is:", string(cmd.Cmd))
+			// Everyone adds cmd to pending commands
+			e.cmdChannel <- cmd
+		case *msg.E2CMsg_Prop:
+			prop := msgIn.GetProp()
+			fmt.Println("Received a propoal from", prop.ProposedBlock.Proposer)
+			go e.handleProposal(prop)
+		case nil:
+			fmt.Println("Unspecified type")
+		default:
+			fmt.Println("Unknown type", x)
+		}
+	}
+}
+
+func (e *E2C) cmdHandler() {
+	for {
+		cmd, ok := <-e.cmdChannel
+		if !ok {
+			fmt.Println("Command Channel error")
+		}
+		fmt.Println("Handling command:", cmd.String())
+		h := cmd.GetHash()
+		var exists bool
+		e.cmdMutex.Lock()
+		_, exists = e.pendingCommands[h]
+		if !exists {
+			e.pendingCommands[h] = cmd
+		}
+		e.cmdMutex.Unlock()
+		// We already received this command once, skip
+		if exists {
+			continue
+		}
+		fmt.Println("Added command to pending commands")
+		// I am not the leader, skip the rest
+		if e.leader != e.config.GetID() {
+			continue
+		}
+		// If I am the leader, then propose
+		go e.propose()
 	}
 }

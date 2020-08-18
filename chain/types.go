@@ -16,5 +16,5 @@ type BlockChain struct {
 	// Unconfirmed Blocks
 	UnconfirmedBlocks map[crypto.Hash]*Block
 	// Chain head
-	head uint64
+	Head uint64
 }

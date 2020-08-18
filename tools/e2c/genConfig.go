@@ -44,7 +44,7 @@ func main() {
 	optNumReplica := getopt.Uint64('n', nReplicas, "", "Number of Replicas(n)")
 	optNumFaulty := getopt.Uint64('f', nFaulty, "", "Numer of Faulty Replicas(f) [Cannot exceed n-1/2]")
 	optBlockSize := getopt.Uint64('b', blkSize, "", "Number of commands per block(b)")
-	optDelay := getopt.Uint64('d', 1000, "", "Network Delay(d) [in milliseconds]")
+	optDelay := getopt.Uint64('d', 10000, "", "Network Delay(d) [in milliseconds]")
 	optBasePort := getopt.Uint32('p', basePort, "", "Base port for repicas. The nodes will use ports starting from this port number.")
 	optClientBasePort := getopt.Uint32('c', clientBasePort, "", "Base port for clients. The clients will use these ports to talk to the nodes.")
 	help := getopt.BoolLong("help", 'h', "Show this help message and exit")

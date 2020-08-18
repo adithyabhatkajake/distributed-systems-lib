@@ -14,6 +14,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/adithyabhatkajake/libe2c/chain"
 	"github.com/adithyabhatkajake/libe2c/config/e2c"
 	e2cconsensus "github.com/adithyabhatkajake/libe2c/consensus/e2c"
 	"github.com/adithyabhatkajake/libe2c/crypto"
@@ -203,7 +204,7 @@ func main() {
 		cmdStr := fmt.Sprintf("Do my bidding #%d my servant!", idx)
 
 		// Build a command
-		cmd := &msg.Command{}
+		cmd := &chain.Command{}
 		// Set command
 		cmd.Cmd = []byte(cmdStr)
 		// Sign the command

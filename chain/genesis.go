@@ -22,5 +22,5 @@ func GetGenesis() *Block {
 
 // Ensure that the blockhash is computed
 func init() {
-	genesisBlock.BlockHash = genesisBlock.GetHash()
+	genesisBlock.BlockHash = genesisBlock.GetHash().GetBytes()
 }

@@ -1,10 +1,14 @@
 package e2c
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"time"
+
+	"github.com/adithyabhatkajake/libe2c/chain"
+	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libe2c/util"
 
 	"github.com/libp2p/go-libp2p"
 
@@ -19,6 +23,8 @@ import (
 const (
 	// ProtocolID is the ID for E2C Protocol
 	ProtocolID = "e2c/e2c/0.0.1"
+	// ProtocolMsgBuffer defines how many protocol messages can be buffered
+	ProtocolMsgBuffer = 100
 )
 
 // Init implements the Protocol interface
@@ -30,7 +36,6 @@ func (e *E2C) Init(c *config.NodeConfig) {
 // Setup sets up the network components
 func (e *E2C) Setup(n *net.Network) error {
 	e.host = n.H
-	e.ctx = n.Ctx
 	host, err := libp2p.New(
 		context.Background(),
 		libp2p.ListenAddrStrings(e.config.GetClientListenAddr()),
@@ -40,9 +45,22 @@ func (e *E2C) Setup(n *net.Network) error {
 		panic(err)
 	}
 	e.cliHost = host
+	e.ctx = n.Ctx
+
+	// Setup maps
 	e.pMap = n.PeerMap
-	e.msgChannel = make(chan msg.E2CMsg, 100)
-	e.streamMap = make(map[uint64]network.Stream)
+	e.streamMap = make(map[uint64]*bufio.ReadWriter)
+	e.pendingCommands = make(map[crypto.Hash]*chain.Command)
+	e.timerMaps = make(map[uint64]*util.Timer)
+
+	// Setup channels
+	e.msgChannel = make(chan *msg.E2CMsg, ProtocolMsgBuffer)
+	e.cmdChannel = make(chan *chain.Command, ProtocolMsgBuffer)
+
+	// Obtain a new chain
+	e.bc = chain.NewChain()
+	// TODO: create a new chain only if no chain is present in the data directory
+
 	// How to react to Protocol Messages
 	e.host.SetStreamHandler(ProtocolID, e.ProtoMsgHandler)
 
@@ -52,16 +70,17 @@ func (e *E2C) Setup(n *net.Network) error {
 	// Connect to all the other nodes talking E2C protocol
 	for idx, p := range e.pMap {
 		fmt.Println("Attempting to open a stream with", p, "using protocol", ProtocolID)
-		retries := 30
+		retries := 300
 		for i := retries; i > 0; i-- {
 			s, err := e.host.NewStream(e.ctx, p.ID, ProtocolID)
 			if err != nil {
 				fmt.Println("Error connecting to peers:", err)
 				fmt.Println("Retrying in a minute")
-				<-time.After(time.Minute)
+				<-time.After(time.Second)
 				continue
 			}
-			e.streamMap[idx] = s
+			e.streamMap[idx] = bufio.NewReadWriter(
+				bufio.NewReader(s), bufio.NewWriter(s))
 			fmt.Println("Connected to Node-#", idx)
 			break
 		}
@@ -73,10 +92,10 @@ func (e *E2C) Setup(n *net.Network) error {
 
 // Start implements the Protocol Interface
 func (e *E2C) Start() {
-	// Start E2C Protocol
+	// Concurrently handle commands
+	go e.cmdHandler()
+	// Start E2C Protocol - Start message handler
 	e.protocol()
-	// Run the protocol for 10 minutes before shutting down
-	<-time.After(10 * time.Minute)
 }
 
 // ProtoMsgHandler reacts to all protocol messages in the network
@@ -100,9 +119,10 @@ func (e *E2C) ProtoMsgHandler(s network.Stream) {
 	// A global buffer to collect messages
 	buf := make([]byte, msg.MaxMsgSize)
 	// Event Handler
+	reader := bufio.NewReader(s)
 	for {
 		// Receive a message from anyone and process them
-		len, err := io.ReadFull(s, buf)
+		len, err := reader.Read(buf)
 		if err != nil {
 			e.errCh <- err
 			return
