@@ -12,6 +12,7 @@ require (
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/pborman/getopt v0.0.0-20190409184431-ee0cd42419d3
+	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.6.1
 	github.com/tendermint/go-amino v0.14.1
 	github.com/tendermint/tendermint v0.33.5

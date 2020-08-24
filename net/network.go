@@ -2,9 +2,10 @@ package net
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
+
+	"github.com/adithyabhatkajake/libe2c/log"
 
 	"github.com/adithyabhatkajake/libe2c/config"
 	"github.com/adithyabhatkajake/libe2c/crypto"
@@ -20,7 +21,7 @@ var (
 	// RetryLimit specifies how many times to try dialing a node
 	RetryLimit = 30
 	// RetryWaitDuration specifies how many times to wait between each tries
-	RetryWaitDuration = "20s"
+	RetryWaitDuration = "1s"
 )
 
 // Network contains all the networking related data structures
@@ -91,10 +92,10 @@ func (n *Network) connectPeer(wg *sync.WaitGroup, p *peerstore.AddrInfo) {
 	var err error
 	t, _ := time.ParseDuration(RetryWaitDuration)
 	for i := 0; i < RetryLimit; i++ {
-		fmt.Println("Attempting connection to", *p)
+		log.Info("Attempting connection to", *p)
 		err = n.H.Connect(n.Ctx, *p)
 		if err != nil {
-			fmt.Println("Connection Failed. Retrying Attempt #", i)
+			log.Debug("Connection Failed. Retrying Attempt #", i)
 			<-time.After(t)
 			continue
 		}
@@ -111,6 +112,7 @@ func (n *Network) ShutDown() {
 	defer n.CancelFunc()
 	err := n.H.Close()
 	if err != nil {
+		log.Error(err)
 		panic(err)
 	}
 }

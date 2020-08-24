@@ -3,11 +3,12 @@ package e2c
 import (
 	"bufio"
 	"context"
-	"fmt"
+	"sync"
 	"time"
 
 	"github.com/adithyabhatkajake/libe2c/chain"
 	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libe2c/log"
 	"github.com/adithyabhatkajake/libe2c/util"
 
 	"github.com/libp2p/go-libp2p"
@@ -18,6 +19,7 @@ import (
 	msg "github.com/adithyabhatkajake/libe2c/msg/e2c"
 
 	"github.com/libp2p/go-libp2p-core/network"
+	peerstore "github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -31,6 +33,8 @@ const (
 func (e *E2C) Init(c *config.NodeConfig) {
 	e.config = c
 	e.leader = DefaultLeaderID
+	e.view = 1 // View Number starts from 1
+	e.blTimer = nil
 }
 
 // Setup sets up the network components
@@ -50,6 +54,7 @@ func (e *E2C) Setup(n *net.Network) error {
 	// Setup maps
 	e.pMap = n.PeerMap
 	e.streamMap = make(map[uint64]*bufio.ReadWriter)
+	e.cliMap = make(map[*bufio.ReadWriter]bool)
 	e.pendingCommands = make(map[crypto.Hash]*chain.Command)
 	e.timerMaps = make(map[uint64]*util.Timer)
 
@@ -68,24 +73,32 @@ func (e *E2C) Setup(n *net.Network) error {
 	e.cliHost.SetStreamHandler(ClientProtocolID, e.ClientMsgHandler)
 
 	// Connect to all the other nodes talking E2C protocol
+	wg := &sync.WaitGroup{} // For faster setup
 	for idx, p := range e.pMap {
-		fmt.Println("Attempting to open a stream with", p, "using protocol", ProtocolID)
-		retries := 300
-		for i := retries; i > 0; i-- {
-			s, err := e.host.NewStream(e.ctx, p.ID, ProtocolID)
-			if err != nil {
-				fmt.Println("Error connecting to peers:", err)
-				fmt.Println("Retrying in a minute")
-				<-time.After(time.Second)
-				continue
+		wg.Add(1)
+		go func(idx uint64, p *peerstore.AddrInfo) {
+			log.Trace("Attempting to open a stream with", p, "using protocol", ProtocolID)
+			retries := 300
+			for i := retries; i > 0; i-- {
+				s, err := e.host.NewStream(e.ctx, p.ID, ProtocolID)
+				if err != nil {
+					log.Error("Error connecting to peers:", err)
+					log.Info("Retry attempt ", retries-i+1, " to connect to node ", idx, " in a second")
+					<-time.After(time.Second)
+					continue
+				}
+				e.netMutex.Lock()
+				e.streamMap[idx] = bufio.NewReadWriter(
+					bufio.NewReader(s), bufio.NewWriter(s))
+				e.netMutex.Unlock()
+				log.Info("Connected to Node ", idx)
+				break
 			}
-			e.streamMap[idx] = bufio.NewReadWriter(
-				bufio.NewReader(s), bufio.NewWriter(s))
-			fmt.Println("Connected to Node-#", idx)
-			break
-		}
+			wg.Done()
+		}(idx, p)
 	}
-	fmt.Println("Setup Finished. Ready to do SMR:)")
+	wg.Wait()
+	log.Info("Setup Finished. Ready to do SMR:)")
 
 	return nil
 }
@@ -108,12 +121,12 @@ func (e *E2C) ProtoMsgHandler(s network.Stream) {
 		select {
 		case err, ok := <-e.errCh:
 			if ok {
-				fmt.Println("Type-I", err, ok)
+				log.Error("Type-I ", err, ok)
 			} else {
-				fmt.Println("Type-II", err, ok)
+				log.Error("Type-II", err, ok)
 			}
 		}
-		s.Reset()
+		s.Close()
 	}()
 
 	// A global buffer to collect messages

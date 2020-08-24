@@ -1,19 +1,18 @@
 package e2c
 
 import (
-	"fmt"
-
+	"github.com/adithyabhatkajake/libe2c/log"
 	msg "github.com/adithyabhatkajake/libe2c/msg/e2c"
 	pb "github.com/golang/protobuf/proto"
 )
 
 func (e *E2C) react(m []byte) {
-	fmt.Println("Received a message of size", len(m))
-
+	log.Trace("Received a message of size", len(m))
 	inMessage := &msg.E2CMsg{}
 	err := pb.Unmarshal(m, inMessage)
 	if err != nil {
-		panic(err)
+		log.Error("Received an invalid protocol message", err)
+		return
 	}
 	e.msgChannel <- inMessage
 }
@@ -23,24 +22,30 @@ func (e *E2C) protocol() {
 	for {
 		msgIn, ok := <-e.msgChannel
 		if !ok {
-			fmt.Println("Msg channel error")
+			log.Error("Msg channel error")
 		}
-		fmt.Println("Received msg", msgIn.String())
+		log.Trace("Received msg", msgIn.String())
 		switch x := msgIn.Msg.(type) {
 		case *msg.E2CMsg_Cmd:
-			fmt.Println("Got a command from client boss!")
+			log.Trace("Got a command from client boss!")
 			cmd := msgIn.GetCmd()
-			fmt.Println("Cmd is:", string(cmd.Cmd))
+			log.Trace("Cmd is:", string(cmd.Cmd))
 			// Everyone adds cmd to pending commands
 			e.cmdChannel <- cmd
 		case *msg.E2CMsg_Prop:
 			prop := msgIn.GetProp()
-			fmt.Println("Received a propoal from", prop.ProposedBlock.Proposer)
+			log.Trace("Received a propoal from", prop.ProposedBlock.Proposer)
 			go e.handleProposal(prop)
+		case *msg.E2CMsg_Npblame:
+			blMsg := msgIn.GetNpblame()
+			go e.handleNoProgressBlame(blMsg)
+		case *msg.E2CMsg_Eqblame:
+			_ = msgIn.GetEqblame()
+			// TODO
 		case nil:
-			fmt.Println("Unspecified type")
+			log.Warn("Unspecified type")
 		default:
-			fmt.Println("Unknown type", x)
+			log.Warn("Unknown type", x)
 		}
 	}
 }
@@ -49,12 +54,22 @@ func (e *E2C) cmdHandler() {
 	for {
 		cmd, ok := <-e.cmdChannel
 		if !ok {
-			fmt.Println("Command Channel error")
+			log.Error("Command Channel error")
 		}
-		fmt.Println("Handling command:", cmd.String())
+		log.Trace("Handling command:", cmd.String())
 		h := cmd.GetHash()
 		var exists bool
+		log.Trace("Trying to acquire cmdMutex lock")
 		e.cmdMutex.Lock()
+		log.Trace("Acquired cmdMutex lock")
+		// If this is the first command, start the blame timer
+		log.Trace("Checking if we are adding a command to an empty pendingCommmads buffer")
+		if len(e.pendingCommands) == 0 {
+			log.Debug("First command received. Starting Blame timer")
+			go e.startBlameTimer()
+		}
+		log.Trace("Adding command to pending commands buffer")
+		// Add cmd to pending commands
 		_, exists = e.pendingCommands[h]
 		if !exists {
 			e.pendingCommands[h] = cmd
@@ -64,7 +79,7 @@ func (e *E2C) cmdHandler() {
 		if exists {
 			continue
 		}
-		fmt.Println("Added command to pending commands")
+		log.Trace("Added command to pending commands")
 		// I am not the leader, skip the rest
 		if e.leader != e.config.GetID() {
 			continue

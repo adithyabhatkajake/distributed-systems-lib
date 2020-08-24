@@ -23,8 +23,9 @@ func (h Hash) GetBytes() []byte {
 	return h[:]
 }
 
-// ToHash converts
-func ToHash(b []byte) {
+// ToHash converts []byte into [hashlen]byte
+func ToHash(b []byte) Hash {
 	var h Hash
 	copy(h[:], b[0:HashLen])
+	return h
 }

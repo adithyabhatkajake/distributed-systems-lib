@@ -8,11 +8,12 @@ import (
 	"time" // https://golang.org/pkg/time/
 )
 
-// Timer is an extension of golang's timer, that allows cancelling
+// Timer is an implementation of Time based event dispatching
 type Timer struct {
-	callable func()
-	dur      time.Duration
-	cancel   chan struct{}
+	callable      func()
+	dur           time.Duration
+	internalTimer *time.Timer
+	cancel        chan struct{}
 }
 
 // NewTimer returns a new timer with the given callback function
@@ -29,20 +30,27 @@ func (t *Timer) SetTime(dur time.Duration) {
 
 // Start begins the countdown for the timer
 func (t *Timer) Start() {
-	// Start a thread that waits for the timer to finish
+	t.internalTimer = time.NewTimer(t.dur)
+	// Start a goroutine that waits for the timer to finish
 	go func() {
 		// Wait for timer to finish or if cancelled
 		select {
-		case <-time.After(t.dur):
+		case <-t.internalTimer.C:
 			t.callable()
-		case <-t.cancel:
+		case _ = <-t.cancel:
+			t.internalTimer.Stop()
 			return
 		}
 	}()
 }
 
+// Reset restarts the timer for the same duration
+func (t Timer) Reset() {
+	t.internalTimer.Reset(t.dur)
+}
+
 // Cancel cancels the timer
-func (t *Timer) Cancel() {
+func (t Timer) Cancel() {
 	var a struct{}
 	t.cancel <- a
 }

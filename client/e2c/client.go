@@ -4,7 +4,7 @@ package main
  * A client does the following:
  * Read the config to get public key and IP maps
  * Let B be the number of commands.
- * Send B commands to the nodes and wait for f+1 acknowledgements
+ * Send B commands to the nodes and wait for f+1 acknowledgements for every acknowledgement
  */
 
 import (
@@ -13,6 +13,9 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	"github.com/adithyabhatkajake/libe2c/log"
+	"github.com/adithyabhatkajake/libe2c/util"
 
 	"github.com/adithyabhatkajake/libe2c/chain"
 	"github.com/adithyabhatkajake/libe2c/config/e2c"
@@ -28,11 +31,6 @@ import (
 	peerstore "github.com/libp2p/go-libp2p-core/peer"
 )
 
-type vote struct {
-	voter uint64
-	cmd   crypto.Hash
-}
-
 var (
 	// BufferCommands defines how many commands to wait for
 	// acknowledgement in a batch
@@ -43,81 +41,99 @@ var (
 	cmdMutex        = &sync.Mutex{}
 	streamMutex     = &sync.Mutex{}
 	voteMutex       = &sync.Mutex{}
-	voteChannel     chan vote
+	condLock        = &sync.Mutex{}
+	cond            = sync.NewCond(condLock)
+	voteChannel     chan *msg.CommitAck
 	idMap           = make(map[string]uint64)
 	votes           = make(map[crypto.Hash]uint64)
 	f               uint64
 )
 
-func sendRequest(cmdChannel chan *msg.E2CMsg, rwMap map[uint64]*bufio.Writer) {
-	for {
-		cmdMsg, ok := <-cmdChannel
-		fmt.Println("Processing Command")
-		if !ok {
-			fmt.Println("sendRequest channel processing error")
-			fmt.Println("Closing thread")
-			return
-		}
-		data, err := pb.Marshal(cmdMsg)
-		if err != nil {
-			fmt.Println("Marshaling error", err)
-			continue
-		}
-		// Ship command off to the nodes
-		for idx, rw := range rwMap {
-			streamMutex.Lock()
-			rw.Write(data)
-			rw.Flush()
-			streamMutex.Unlock()
-			fmt.Println("Sending command to node", idx)
-		}
+func sendCommandToServer(cmd *msg.E2CMsg, rwMap map[uint64]*bufio.Writer) {
+	log.Trace("Processing Command")
+	data, err := pb.Marshal(cmd)
+	if err != nil {
+		log.Error("Marshaling error", err)
+		return
+	}
+	// Ship command off to the nodes
+	for idx, rw := range rwMap {
+		streamMutex.Lock()
+		rw.Write(data)
+		rw.Flush()
+		streamMutex.Unlock()
+		log.Trace("Sending command to node", idx)
 	}
 }
 
-func ackMsgHandler(s network.Stream) {
+func ackMsgHandler(s network.Stream, serverID uint64) {
 	reader := bufio.NewReader(s)
 	// Prepare a buffer to receive an acknowledgement
 	msgBuf := make([]byte, msg.MaxMsgSize)
+	log.Trace("Started acknowledgement message handler")
 	for {
-		_, err := reader.Read(msgBuf)
+		len, err := reader.Read(msgBuf)
 		if err != nil {
-			fmt.Println("bufio read error", err)
+			log.Error("bufio read error", err)
 			return
 		}
-		// Ensure Correct Signature
-		v := vote{
-			voter: idMap[s.ID()],
+		log.Trace("Received a message from the server.", serverID)
+		msg := &msg.E2CMsg{}
+		err = pb.Unmarshal(msgBuf[0:len], msg)
+		if err != nil {
+			log.Error("Unmarshalling error", serverID, err)
+			continue
 		}
-		voteChannel <- v
+		voteChannel <- msg.GetAck()
 	}
 }
 
-func handleVotes() {
+func handleVotes(cmdChannel chan *msg.E2CMsg, rwMap map[uint64]*bufio.Writer) {
+	voteMap := make(map[crypto.Hash]uint64)
+	commitMap := make(map[crypto.Hash]bool)
 	for {
 		// Get Acknowledgements from nodes after consensus
 		v, ok := <-voteChannel
+		log.Trace("Received an acknowledgement")
 		if !ok {
-			fmt.Println("vote channel closed")
+			log.Error("vote channel closed")
 			return
 		}
-		// Deal with the vote
-		// TODO
-		fmt.Println("Received a vote from node", v.voter)
-		voteMutex.Lock()
-		votes[v.cmd]++
-		if votes[v.cmd] > f {
-			fmt.Println(v.cmd, "is committed.")
+		if v == nil {
+			continue
 		}
-		voteMutex.Unlock()
-		// We got acknowledgement for a command
-		cmdMutex.Lock()
-		PendingCommands--
-		cmdMutex.Unlock()
+		// Deal with the vote
+		// We received a vote. Now add this to the conformation map
+		cmdHash := crypto.ToHash(v.CmdHash)
+		_, exists := voteMap[cmdHash]
+		if !exists {
+			voteMap[cmdHash] = 1       // 1 means we have seen one vote so far.
+			commitMap[cmdHash] = false // To say that we have not yet committed this value
+		} else {
+			voteMap[cmdHash]++ // Add another vote
+		}
+		// To ensure this is executed only once, check old committed state
+		old := commitMap[cmdHash]
+		if voteMap[cmdHash] > f {
+			log.Info("Confirmed commit for command ",
+				util.HashToString(cmdHash))
+			commitMap[cmdHash] = true
+		}
+		new := commitMap[cmdHash]
+		// If we commit the block for the first time, then ship off a new command to the server
+		if old != new {
+			cmd := <-cmdChannel
+			log.Info("Sending command ", cmd, " to the servers")
+			go sendCommandToServer(cmd, rwMap)
+		}
 	}
 }
 
 func main() {
-	fmt.Println("I am the client")
+	// Setup Logger
+	log.SetLevel(log.InfoLevel)
+
+	log.Info("I am the client")
 	ctx := context.Background()
 
 	// Get client config
@@ -134,7 +150,11 @@ func main() {
 	}
 
 	// Print self information
-	fmt.Println("Client at", node.Addrs())
+	log.Info("Client at", node.Addrs())
+
+	// Handle all messages received using ackMsgHandler
+	// node.SetStreamHandler(e2cconsensus.ClientProtocolID, ackMsgHandler)
+	// Setting stream handler is useless :/
 
 	pMap := make(map[uint64]peerstore.AddrInfo)
 	streamMap := make(map[uint64]network.Stream)
@@ -145,61 +165,41 @@ func main() {
 		// Prepare peerInfo
 		pMap[i] = confData.GetPeerFromID(i)
 		// Connect to node i
-		fmt.Println("Attempting connection to node", pMap[i])
+		log.Trace("Attempting connection to node ", pMap[i])
 		err = node.Connect(ctx, pMap[i])
 		if err != nil {
-			fmt.Println("Connection Error", err)
+			log.Error("Connection Error ", err)
 			continue
 		}
 		streamMap[i], err = node.NewStream(ctx, pMap[i].ID,
 			e2cconsensus.ClientProtocolID)
 		if err != nil {
-			fmt.Println("Stream opening Error", err)
+			log.Error("Stream opening Error", err)
 			continue
 		}
 		idMap[streamMap[i].ID()] = i
 		connectedNodes++
 		rwMap[i] = bufio.NewWriter(streamMap[i])
+		go ackMsgHandler(streamMap[i], i)
 	}
-	// Handle all messages received here
-	node.SetStreamHandler(e2cconsensus.ClientProtocolID, ackMsgHandler)
 
 	// Ensure we are connected to sufficient nodes
 	if connectedNodes <= f {
-		fmt.Println("Insufficient connections to replicas")
+		log.Warn("Insufficient connections to replicas")
 		return
 	}
 
 	cmdChannel := make(chan *msg.E2CMsg, BufferCommands)
-	voteChannel = make(chan vote, BufferCommands)
+	voteChannel = make(chan *msg.CommitAck, BufferCommands)
 
-	// Run a goroutine that keeps sending requests to the nodes
-	go sendRequest(cmdChannel, rwMap)
-
-	// Spawn a thread that handles acknowledgement received for the
+	// First, spawn a thread that handles acknowledgement received for the
 	// various requests
-	go handleVotes()
+	go handleVotes(cmdChannel, rwMap)
 
-	// Make sure we always fill the channel with commands
 	idx := uint64(0)
-	for {
-		skipLoop := false
-		cmdMutex.Lock()
-		if PendingCommands >= BufferCommands {
-			skipLoop = true
-		} else {
-			PendingCommands++
-		}
-		cmdMutex.Unlock()
 
-		// If the buffer is full, skip sending a command
-		if skipLoop {
-			continue
-		}
-
-		// Increment index
-		idx++
-
+	// Then, run a goroutine that sends the first BufferCommands requests to the nodes
+	for ; idx < BufferCommands; idx++ {
 		// Send via stream a command
 		cmdStr := fmt.Sprintf("Do my bidding #%d my servant!", idx)
 
@@ -219,8 +219,36 @@ func main() {
 			Cmd: cmd,
 		}
 
-		fmt.Println("Sending command to thread")
+		log.Info("Sending command ", idx, " to the servers")
+		go sendCommandToServer(cmdMsg, rwMap)
+	}
+
+	// Make sure we always fill the channel with commands
+
+	for {
+		// Send via stream a command
+		cmdStr := fmt.Sprintf("Do my bidding #%d my servant!", idx)
+
+		// Build a command
+		cmd := &chain.Command{}
+		// Set command
+		cmd.Cmd = []byte(cmdStr)
+		// Sign the command
+		cmd.Clientsig, err = confData.GetMyKey().Sign(cmd.Cmd)
+		if err != nil {
+			panic(err)
+		}
+
+		// Build a protocol message
+		cmdMsg := &msg.E2CMsg{}
+		cmdMsg.Msg = &msg.E2CMsg_Cmd{
+			Cmd: cmd,
+		}
+
 		// Dispatch E2C message for processing
+		// This will block until some of the commands are committed
 		cmdChannel <- cmdMsg
+		// Increment command number
+		idx++
 	}
 }

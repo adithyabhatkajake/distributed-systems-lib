@@ -6,5 +6,5 @@ var (
 )
 
 func (e *E2C) changeLeader() {
-	e.leader = (e.leader + 1) % uint64(len(e.pMap))
+	e.leader = (e.leader + 1) % e.config.GetNumNodes()
 }

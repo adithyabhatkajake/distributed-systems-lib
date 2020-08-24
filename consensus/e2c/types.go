@@ -24,14 +24,26 @@ type E2C struct {
 	ctx     context.Context
 
 	// Maps
-	pMap            map[uint64]*peerstore.AddrInfo
-	streamMap       map[uint64]*bufio.ReadWriter
+	// Mapping between ID and libp2p-peer
+	pMap map[uint64]*peerstore.AddrInfo
+	// A set of all known clients
+	cliMap map[*bufio.ReadWriter]bool
+	// A map of node ID to its corresponding RW stream
+	streamMap map[uint64]*bufio.ReadWriter
+	// A map of hash to pending commands
 	pendingCommands map[crypto.Hash]*chain.Command
-	timerMaps       map[uint64]*util.Timer
+	// A mapping between the block number to its commit timer
+	timerMaps map[uint64]*util.Timer
+	// A mapping between the leader and blames against the leader
+	blameMap map[uint64]*msg.E2CMsg
 
 	// Locks
-	cmdMutex sync.Mutex
-	netMutex sync.Mutex
+	peerMapLock sync.RWMutex // The lock to modify
+	cliMutex    sync.RWMutex // The lock to modify cliMap
+	netMutex    sync.RWMutex // The lock to modify streamMap
+	cmdMutex    sync.RWMutex // The lock to modify pendingCommands
+	timerLock   sync.RWMutex // The lock to modify timerMaps
+	blTimerLock sync.RWMutex // The lock to modify blTimer
 
 	// Channels
 	msgChannel chan *msg.E2CMsg
@@ -42,6 +54,8 @@ type E2C struct {
 	bc *chain.BlockChain
 
 	// Protocol information
-	leader uint64
-	config *config.NodeConfig
+	leader  uint64
+	view    uint64
+	config  *config.NodeConfig
+	blTimer *util.Timer
 }

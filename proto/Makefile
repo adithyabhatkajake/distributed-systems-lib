@@ -14,6 +14,7 @@ all: crypto.proto \
 	e2c/msg/proposal.proto \
 	e2c/msg/blame.proto \
 	e2c/msg/generic.proto \
+	e2c/msg/clientAck.proto \
 	e2c/chain/block.proto
 	@echo "Using Proto Path: ${PROTO_PATH}"
 	@echo "Using Go Out Directory: ${GO_OUT_DIR}"

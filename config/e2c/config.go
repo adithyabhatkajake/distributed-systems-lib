@@ -120,3 +120,8 @@ func (ec *NodeConfig) GetDelta() time.Duration {
 func (ec *NodeConfig) GetCommitWaitTime() time.Duration {
 	return ec.GetDelta() * 2
 }
+
+// GetNPBlameWaitTime returns how long to wait before sending the NP Blame
+func (ec *NodeConfig) GetNPBlameWaitTime() time.Duration {
+	return ec.GetDelta() * 3
+}

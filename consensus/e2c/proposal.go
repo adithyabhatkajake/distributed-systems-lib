@@ -2,11 +2,11 @@ package e2c
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 
 	"github.com/adithyabhatkajake/libe2c/chain"
 	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libe2c/log"
 	msg "github.com/adithyabhatkajake/libe2c/msg/e2c"
 	"github.com/adithyabhatkajake/libe2c/util"
 	pb "github.com/golang/protobuf/proto"
@@ -14,7 +14,7 @@ import (
 
 // Monitor pending commands, if there is any change and the current node is the leader, then start proposing blocks
 func (e *E2C) propose() {
-	fmt.Println("Starting a propose step")
+	log.Trace("Starting a propose step")
 	// If there are sufficient commands in pendingCommands, then propose
 	e.cmdMutex.Lock()
 	blkSize := e.config.GetBlockSize()
@@ -52,65 +52,79 @@ func (e *E2C) propose() {
 	blk := NewBlock(cmds)
 	blk.Proposer = e.config.GetID()
 	// We are mutating the chain, acquire the lock first
-	e.bc.ChainLock.Lock()
-	// Set index
-	blk.Data.Index = e.bc.Head + 1
-	// Set previous hash to the current head
-	blk.Data.PrevHash = e.bc.HeightBlockMap[e.bc.Head].GetBlockHash()
-	// Increment chain head for future proposals
-	e.bc.Head++
-	// Set Hash
-	blk.BlockHash = blk.GetHash().GetBytes()
-	// After setting hash, update block head
-	e.bc.HeightBlockMap[e.bc.Head] = blk
-	// The chain is free for mutation from others now
-	e.bc.ChainLock.Unlock()
+	{
+		e.bc.ChainLock.Lock()
+		// Set index
+		blk.Data.Index = e.bc.Head + 1
+		// Set previous hash to the current head
+		blk.Data.PrevHash = e.bc.HeightBlockMap[e.bc.Head].GetBlockHash()
+		// Increment chain head for future proposals
+		e.bc.Head++
+		// Set old head, so that parallel proposals have the correct prevHash
+		e.bc.HeightBlockMap[e.bc.Head] = blk
+		// Set Hash
+		blk.BlockHash = blk.GetHash().GetBytes()
+		// Set unconfirmed Blocks
+		e.bc.UnconfirmedBlocks[blk.GetHashBytes()] = blk
+		// e.bc.HeightBlockMap[e.bc.head] = blk
+		// The chain is free for mutation from others now
+		e.bc.ChainLock.Unlock()
+	}
 	// Sign
 	data, err := pb.Marshal(blk.Data)
 	if err != nil {
-		fmt.Println("Error in marshalling block data during proposal")
+		log.Error("Error in marshalling block data during proposal")
 		panic(err)
 	}
 	sig, err := e.config.PvtKey.Sign(data)
 	if err != nil {
-		fmt.Println("Error in signing a block during proposal")
+		log.Error("Error in signing a block during proposal")
 		panic(err)
 	}
 	blk.Signature = sig
-	// Send proposal to all other nodes
-	sendMsg := &msg.E2CMsg{}
 	prop := &msg.Proposal{}
 	prop.ProposedBlock = blk
-	sendMsg.Msg = &msg.E2CMsg_Prop{Prop: prop}
-	e.Broadcast(sendMsg)
-	fmt.Println("Finished Proposing")
+	log.Trace("Finished Proposing")
+	// Ship proposal to processing
+
+	relayMsg := &msg.E2CMsg{}
+	relayMsg.Msg = &msg.E2CMsg_Prop{Prop: prop}
+	e.Broadcast(relayMsg) // Propose to all the other nodes
+	// Start 2\delta timer
+	e.startBlockTimer(prop.ProposedBlock)
 }
 
+// Deal with the proposal
+// This will also relay the proposal to all other nodes
 func (e *E2C) handleProposal(prop *msg.Proposal) {
-	fmt.Println("Handling proposal", prop.ProposedBlock.Data.Index)
+	log.Trace("Handling proposal", prop.ProposedBlock.Data.Index)
 	if !prop.ProposedBlock.IsValid() {
-		fmt.Println("Invalid block")
+		log.Warn("Invalid block")
 		return
 	}
 	data, err := pb.Marshal(prop.ProposedBlock.Data)
 	if err != nil {
-		fmt.Println("Proposal error:", err)
+		log.Error("Proposal error:", err)
 		return
 	}
 	correct, err := e.config.GetPubKeyFromID(e.leader).Verify(data,
 		prop.ProposedBlock.Signature)
 	if !correct {
-		fmt.Println("Incorrect signature for proposal")
+		log.Error("Incorrect signature for proposal")
 		return
 	}
-	// First check for equivocation
-	e.bc.ChainLock.Lock()
-	blk, exists := e.bc.HeightBlockMap[prop.ProposedBlock.Data.Index]
-	e.bc.ChainLock.Unlock()
+	var blk *chain.Block
+	var exists bool
+	{
+		// First check for equivocation
+		e.bc.ChainLock.RLock()
+		blk, exists = e.bc.HeightBlockMap[prop.ProposedBlock.Data.Index]
+		e.bc.ChainLock.RUnlock()
+	}
 	if exists &&
 		!bytes.Equal(prop.ProposedBlock.GetBlockHash(), blk.GetBlockHash()) {
 		// Equivocation
-		fmt.Println("Equivocation detected.", blk, prop.ProposedBlock)
+		log.Warn("Equivocation detected.", blk, prop.ProposedBlock)
 		// TODO trigger view change
 		return
 	}
@@ -119,32 +133,63 @@ func (e *E2C) handleProposal(prop *msg.Proposal) {
 		// we have already committed this block, IGNORE
 		return
 	}
-	e.bc.ChainLock.Lock()
-	_, exists = e.bc.UnconfirmedBlocks[prop.ProposedBlock.GetHashBytes()]
-	e.bc.ChainLock.Unlock()
+	{
+		e.bc.ChainLock.RLock()
+		_, exists = e.bc.UnconfirmedBlocks[prop.ProposedBlock.GetHashBytes()]
+		e.bc.ChainLock.RUnlock()
+	}
 	if exists {
 		// Duplicate block received,
 		// We have already received this proposal, IGNORE
 		return
 	}
-	// Otherwise, add the current block to map
-	e.bc.ChainLock.Lock()
-	e.bc.HeightBlockMap[prop.ProposedBlock.Data.Index] = prop.ProposedBlock
-	e.bc.UnconfirmedBlocks[prop.ProposedBlock.GetHashBytes()] =
-		prop.ProposedBlock
-	e.bc.ChainLock.Unlock()
+	e.addNewBlock(prop.ProposedBlock)
+	e.ensureBlockIsDelivered(prop.ProposedBlock)
+
+	// Remove cmds proposed from pending commands
+	e.cmdMutex.Lock()
+	for _, cmd := range prop.ProposedBlock.Data.Cmds {
+		h := cmd.GetHash()
+		delete(e.pendingCommands, h)
+	}
+	e.cmdMutex.Unlock()
+	relayMsg := &msg.E2CMsg{}
+	relayMsg.Msg = &msg.E2CMsg_Prop{Prop: prop}
+	e.Broadcast(relayMsg) // Relay it to all the other nodes
+	log.Trace("Finished relaying the proposal")
+	// Start 2\delta timer
+	e.startBlockTimer(prop.ProposedBlock)
+	// Stop blame timer, since we got a valid proposal
+	// During commit, if pending commands is empty, we will restart the blame timer
+	go e.stopBlameTimer()
+}
+
+// NewBlock creates a new block from the commands received.
+func NewBlock(cmds []*chain.Command) *chain.Block {
+	b := &chain.Block{}
+	b.Data = &chain.BlockData{}
+	b.Data.Cmds = cmds
+	b.Decision = false
+	return b
+}
+
+func (e *E2C) ensureBlockIsDelivered(blk *chain.Block) {
+	var exists bool
+	var parentblk *chain.Block
 	// Ensure that all the parents are delivered first.
-	parentIdx := prop.ProposedBlock.Data.Index - 1
+	parentIdx := blk.Data.Index - 1
 	// Wait for parents to be delivered first
 	for tries := 30; tries > 0; tries-- {
 		<-time.After(time.Second)
-		e.bc.ChainLock.Lock()
-		blk, exists = e.bc.HeightBlockMap[parentIdx]
-		e.bc.ChainLock.Unlock()
+		e.bc.ChainLock.RLock()
+		parentblk, exists = e.bc.HeightBlockMap[parentIdx]
+		e.bc.ChainLock.RUnlock()
 		if exists &&
-			!bytes.Equal(blk.BlockHash, prop.ProposedBlock.Data.PrevHash) {
+			!bytes.Equal(parentblk.BlockHash, blk.Data.PrevHash) {
 			// This block is delivered.
-			fmt.Println("Block extending wrong parent.")
+			log.Warn("Block  ", blk.Data.Index, " extending wrong parent.\n",
+				"Wanted Parent Block:", util.BytesToHexString(parentblk.BlockHash),
+				"Found Parent Block:", util.BytesToHexString(blk.Data.PrevHash))
 			return
 		}
 		if exists {
@@ -155,32 +200,57 @@ func (e *E2C) handleProposal(prop *msg.Proposal) {
 	if !exists {
 		// The parents are not delivered, so we cant process this block
 		// Return
-		fmt.Println("Parents not delivered, aborting this proposal")
+		log.Warn("Parents not delivered, aborting this proposal")
 		return
 	}
 	// All parents are delivered, lets break out!!
-	fmt.Println("All parents are delivered")
+	log.Trace("All parents are delivered")
+}
 
-	relayMsg := &msg.E2CMsg{}
-	relayMsg.Msg = &msg.E2CMsg_Prop{Prop: prop}
-	e.Broadcast(relayMsg) // Relay it to all the other nodes
-	fmt.Println("Finished relaying the proposal")
+func (e *E2C) startBlockTimer(blk *chain.Block) {
+	var err error
 	// Start 2delta timer
 	timer := util.NewTimer(func() {
-		fmt.Println("Committing block", prop.ProposedBlock)
+		log.Info("Committing block-", blk.Data.Index)
 		// Let the client know that we committed this block
-		// TODO
+		for _, cmd := range blk.Data.Cmds {
+			ack := &msg.CommitAck{}
+			cmdHash := cmd.GetHash()
+			ack.CmdHash = cmdHash.GetBytes()
+			ack.Id = e.config.GetID()
+			ack.Signature, err = e.config.GetMyKey().Sign(ack.CmdHash)
+			log.Trace("Sending ack ", ack.CmdHash, " to clients")
+			if err != nil {
+				log.Error("Error sending ack ", ack.CmdHash, " to clients")
+				continue
+			}
+			e2cmsg := &msg.E2CMsg{}
+			e2cmsg.Msg = &msg.E2CMsg_Ack{Ack: ack}
+			// Tell all the clients, that I have committed this block
+			e.ClientBroadcast(e2cmsg)
+			// Now remove this block from unconfirmed blocks
+			e.bc.ChainLock.Lock()
+			delete(e.bc.UnconfirmedBlocks, blk.GetHashBytes())
+			e.bc.ChainLock.Unlock()
+		}
 	})
+	log.Info("Started timer for block-", blk.Data.Index)
 	timer.SetTime(e.config.GetCommitWaitTime())
-	e.timerMaps[prop.ProposedBlock.Data.Index] = timer
+	e.addNewTimer(blk.Data.Index, timer)
 	timer.Start()
 }
 
-// NewBlock creates a new block from the commands received.
-func NewBlock(cmds []*chain.Command) *chain.Block {
-	b := &chain.Block{}
-	b.Data = &chain.BlockData{}
-	b.Data.Cmds = cmds
-	b.Decision = false
-	return b
+func (e *E2C) addNewBlock(blk *chain.Block) {
+	// Otherwise, add the current block to map
+	e.bc.ChainLock.Lock()
+	e.bc.HeightBlockMap[blk.Data.Index] = blk
+	e.bc.UnconfirmedBlocks[blk.GetHashBytes()] =
+		blk
+	e.bc.ChainLock.Unlock()
+}
+
+func (e *E2C) addNewTimer(pos uint64, timer *util.Timer) {
+	e.timerLock.Lock()
+	e.timerMaps[pos] = timer
+	e.timerLock.Unlock()
 }
