@@ -34,16 +34,18 @@ type E2C struct {
 	pendingCommands map[crypto.Hash]*chain.Command
 	// A mapping between the block number to its commit timer
 	timerMaps map[uint64]*util.Timer
-	// A mapping between the leader and blames against the leader
-	blameMap map[uint64]*msg.E2CMsg
+	// A mapping between the view and (A mapping between the origin and blames against the leader)
+	blameMap map[uint64]map[uint64]*msg.Blame
 
-	// Locks
+	/* Locks - We separate all the locks, so that acquiring
+	one lock does not make other goroutines stop */
 	peerMapLock sync.RWMutex // The lock to modify
 	cliMutex    sync.RWMutex // The lock to modify cliMap
 	netMutex    sync.RWMutex // The lock to modify streamMap
 	cmdMutex    sync.RWMutex // The lock to modify pendingCommands
 	timerLock   sync.RWMutex // The lock to modify timerMaps
 	blTimerLock sync.RWMutex // The lock to modify blTimer
+	blLock      sync.RWMutex // The lock to modify blameMap
 
 	// Channels
 	msgChannel chan *msg.E2CMsg

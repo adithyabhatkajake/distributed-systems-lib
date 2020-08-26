@@ -125,3 +125,8 @@ func (ec *NodeConfig) GetCommitWaitTime() time.Duration {
 func (ec *NodeConfig) GetNPBlameWaitTime() time.Duration {
 	return ec.GetDelta() * 3
 }
+
+// GetNumberOfFaultyNodes computes f for this protocol as f = (n-1)/2
+func (ec *NodeConfig) GetNumberOfFaultyNodes() uint64 {
+	return uint64((ec.GetNumNodes() - 1) / 2)
+}

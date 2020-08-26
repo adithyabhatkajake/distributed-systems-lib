@@ -212,6 +212,8 @@ func (e *E2C) startBlockTimer(blk *chain.Block) {
 	// Start 2delta timer
 	timer := util.NewTimer(func() {
 		log.Info("Committing block-", blk.Data.Index)
+		// We have committed this block
+		blk.Decision = true
 		// Let the client know that we committed this block
 		for _, cmd := range blk.Data.Cmds {
 			ack := &msg.CommitAck{}

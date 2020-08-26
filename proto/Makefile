@@ -5,17 +5,35 @@ GO_OUT_DIR=/home/haxolotl/go/src/
 # https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html
 
 # Build all the protobuf files
-all: crypto.proto \
+.PHONY: all e2c synchs clean
+
+all: e2c synchs
+
+e2c: crypto.proto \
 	net.proto \
 	e2c/config/node.proto \
 	e2c/config/protocol.proto \
 	e2c/config/client-config.proto \
-	e2c/chain/command.proto \
+	chain/command.proto \
+	chain/block.proto \
 	e2c/msg/proposal.proto \
 	e2c/msg/blame.proto \
 	e2c/msg/generic.proto \
-	e2c/msg/clientAck.proto \
-	e2c/chain/block.proto
+	e2c/msg/clientAck.proto
+	@echo "Using Proto Path: ${PROTO_PATH}"
+	@echo "Using Go Out Directory: ${GO_OUT_DIR}"
+	# Build only changed protobuf definitions
+	# Compiling Protobuf tips
+	# https://jbrandhorst.com/post/go-protobuf-tips/
+	protoc $? -I${PROTO_PATH} --go_out=:${GO_OUT_DIR}
+
+synchs: synchs/config/node.proto \
+	synchs/config/protocol.proto \
+	synchs/config/client-config.proto \
+	synchs/msg/proposal.proto \
+	synchs/msg/blame.proto \
+	synchs/msg/generic.proto \
+	synchs/msg/clientAck.proto
 	@echo "Using Proto Path: ${PROTO_PATH}"
 	@echo "Using Go Out Directory: ${GO_OUT_DIR}"
 	# Build only changed protobuf definitions

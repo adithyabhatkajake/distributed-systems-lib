@@ -57,6 +57,7 @@ func (e *E2C) Setup(n *net.Network) error {
 	e.cliMap = make(map[*bufio.ReadWriter]bool)
 	e.pendingCommands = make(map[crypto.Hash]*chain.Command)
 	e.timerMaps = make(map[uint64]*util.Timer)
+	e.blameMap = make(map[uint64]map[uint64]*msg.Blame)
 
 	// Setup channels
 	e.msgChannel = make(chan *msg.E2CMsg, ProtocolMsgBuffer)

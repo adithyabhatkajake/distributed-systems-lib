@@ -6,7 +6,7 @@ option go_package = "github.com/adithyabhatkajake/libe2c/msg/e2c" ;
 import "e2c/msg/proposal.proto" ;
 import "e2c/msg/blame.proto" ;
 import "e2c/msg/clientAck.proto" ;
-import "e2c/chain/command.proto" ;
+import "chain/command.proto" ;
 
 message E2CMsg {
     oneof Msg {
@@ -15,5 +15,6 @@ message E2CMsg {
         msg.EquivocationBlame Eqblame = 3 ;
         msg.CommitAck Ack = 4 ;
         chain.Command Cmd = 5 ;
+        msg.QuitView QV = 6 ;
     }
 }

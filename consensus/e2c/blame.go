@@ -30,7 +30,9 @@ func (e *E2C) stopBlameTimer() {
 	defer e.blTimerLock.Unlock()
 	if e.blTimer != nil {
 		e.blTimer.Cancel()
+		// Set blTimer to nil because the blame timer is not reusable.
 		e.blTimer = nil
+		// NOTE: I hope the golang gc frees the memory later
 	}
 }
 
@@ -41,6 +43,8 @@ func (e *E2C) resetBlameTimer() {
 	e.blTimerLock.Unlock()
 }
 
+/* sendNPBlame sends NoProgress blame.
+This is usually triggered when the blame timer for the leader in a view, times out. */
 func (e *E2C) sendNPBlame() {
 	log.Warn("Sending an NP-Blame message")
 	blame := &msg.NoProgressBlame{}
@@ -61,6 +65,7 @@ func (e *E2C) sendNPBlame() {
 	blMsg := &msg.E2CMsg{}
 	blMsg.Msg = &msg.E2CMsg_Npblame{Npblame: blame}
 	e.Broadcast(blMsg)
+	go e.handleNoProgressBlame(blame) // Process self blame
 }
 
 func (e *E2C) handleNoProgressBlame(bl *msg.NoProgressBlame) {
@@ -72,10 +77,25 @@ func (e *E2C) handleNoProgressBlame(bl *msg.NoProgressBlame) {
 		log.Debugln("Received an invalid blame message", bl.String())
 		return
 	}
+	view := bl.Blame.BlData.View
 	// Add it to the blame map
-	// TODO
+	e.blLock.Lock()
+	_, exists := e.blameMap[view]
+	if !exists {
+		e.blameMap[view] = make(map[uint64]*msg.Blame)
+	}
+	_, exists = e.blameMap[view][bl.Blame.BlOrigin]
+	if !exists {
+		e.blameMap[view][bl.Blame.BlOrigin] = bl.Blame
+	}
 	// Check if the blame map has sufficient blames
 	// If there are more than f blames, then initiate quit view
+	numBlames := uint64(len(e.blameMap[view]))
+	if numBlames > e.config.GetNumberOfFaultyNodes() {
+		// Quit the View
+		go e.QuitView()
+	}
+	e.blLock.Unlock()
 }
 
 func (e *E2C) isNPBlameValid(bl *msg.NoProgressBlame) bool {

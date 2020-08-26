@@ -14,18 +14,17 @@ func (e *E2C) Broadcast(m *msg.E2CMsg) error {
 	if err != nil {
 		return err
 	}
+	// If we fail to send a message to someone, continue
 	for idx, s := range e.streamMap {
 		_, err = s.Write(data)
 		if err != nil {
 			log.Error("Error while sending to node", idx)
 			log.Error("Error:", err)
-			return err
 		}
 		err = s.Flush()
 		if err != nil {
 			log.Error("Error while sending to node", idx)
 			log.Error("Error:", err)
-			return err
 		}
 	}
 	return nil

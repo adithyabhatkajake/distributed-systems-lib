@@ -6,7 +6,7 @@ proto:
 
 # Build all the tools
 alltools: 
-	make -C tools/e2c/
+	make -C tools/
 
 # Build all the nodes
 allnodes:
@@ -16,7 +16,7 @@ allclients:
 	make -C client/
 
 testfiles: 
-	make -C tools/e2c testfiles
+	make -C tools/ testfiles
 
 clean:
 	@make -C proto/ clean

@@ -30,3 +30,7 @@ message EquivocationBlame {
 	msg.Proposal b1 = 2 ;
 	msg.Proposal b2 = 3 ;
 }
+
+message QuitView {
+	Certificate BlCert = 1 ;
+}
