@@ -89,5 +89,5 @@ func (shs *NodeConfig) GetNPBlameWaitTime() time.Duration {
 
 // GetNumberOfFaultyNodes computes f for this protocol as f = (n-1)/2
 func (shs *NodeConfig) GetNumberOfFaultyNodes() uint64 {
-	return uint64((shs.GetNumNodes() - 1) / 2)
+	return shs.Config.ProtConfig.Info.Faults
 }

@@ -11,7 +11,7 @@ var (
 			PrevHash: make([]byte, crypto.HashLen),
 		},
 		Decision: true,
-		Proposer: 0,
+		Proposer: 1,
 	}
 )
 

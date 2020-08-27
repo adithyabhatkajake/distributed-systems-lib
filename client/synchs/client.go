@@ -14,7 +14,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/adithyabhatkajake/libe2c/config/e2c"
+	"github.com/adithyabhatkajake/libe2c/config/synchs"
 	"github.com/adithyabhatkajake/libe2c/log"
 	"github.com/adithyabhatkajake/libe2c/util"
 
@@ -137,10 +137,10 @@ func main() {
 	ctx := context.Background()
 
 	// Get client config
-	confData := &e2c.ClientConfig{}
+	confData := &synchs.ClientConfig{}
 	e2cio.ReadFromFile(confData, os.Args[1])
 
-	f = uint64((confData.GetNumNodes() - 1) / 2)
+	f = confData.Config.Info.Faults
 	// Start networking stack
 	node, err := p2p.New(ctx,
 		libp2p.Identity(confData.GetMyKey()),

@@ -34,6 +34,8 @@ type SyncHS struct {
 	pendingCommands map[crypto.Hash]*chain.Command
 	// A mapping between the block number to its commit timer
 	timerMaps map[uint64]*util.Timer
+	// Certificate map
+	certMap map[uint64]*msg.BlockCertificate
 	// A mapping between the view and (A mapping between the origin and blames against the leader)
 	blameMap map[uint64]map[uint64]*msg.Blame
 
@@ -46,11 +48,13 @@ type SyncHS struct {
 	timerLock   sync.RWMutex // The lock to modify timerMaps
 	blTimerLock sync.RWMutex // The lock to modify blTimer
 	blLock      sync.RWMutex // The lock to modify blameMap
+	certMapLock sync.RWMutex // The lock to modify certMap
 
 	// Channels
-	msgChannel chan *msg.SyncHSMsg
-	cmdChannel chan *chain.Command
-	errCh      chan error
+	msgChannel  chan *msg.SyncHSMsg
+	cmdChannel  chan *chain.Command
+	voteChannel chan *msg.Vote
+	errCh       chan error
 
 	// Block chain
 	bc *chain.BlockChain

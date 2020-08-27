@@ -1,0 +1,20 @@
+syntax = "proto3" ;
+package msg ;
+
+option go_package = "github.com/adithyabhatkajake/libe2c/msg/apollo" ;
+
+import "apollo/msg/proposal.proto" ;
+import "apollo/msg/blame.proto" ;
+import "apollo/msg/clientAck.proto" ;
+import "chain/command.proto" ;
+
+message ApolloMsg {
+    oneof Msg {
+        msg.Proposal Prop = 1 ;
+        msg.NoProgressBlame Npblame = 2 ;
+        msg.EquivocationBlame Eqblame = 3 ;
+        msg.CommitAck Ack = 4 ;
+        chain.Command Cmd = 5 ;
+        msg.QuitView QV = 6 ;
+    }
+}

@@ -11,7 +11,7 @@ import (
 
 // Implement how to talk to clients
 const (
-	ClientProtocolID = "e2c/client/0.0.1"
+	ClientProtocolID = "synchs/client/0.0.1"
 )
 
 // ClientMsgHandler defines how to talk to client messages

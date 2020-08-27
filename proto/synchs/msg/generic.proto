@@ -6,6 +6,7 @@ option go_package = "github.com/adithyabhatkajake/libe2c/msg/synchs" ;
 import "synchs/msg/proposal.proto" ;
 import "synchs/msg/blame.proto" ;
 import "synchs/msg/clientAck.proto" ;
+import "synchs/msg/vote.proto" ;
 import "chain/command.proto" ;
 
 message SyncHSMsg {
@@ -16,5 +17,6 @@ message SyncHSMsg {
         msg.CommitAck Ack = 4 ;
         chain.Command Cmd = 5 ;
         msg.QuitView QV = 6 ;
+        msg.Vote Vote = 7 ;
     }
 }

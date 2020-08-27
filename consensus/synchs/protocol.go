@@ -24,7 +24,7 @@ import (
 
 const (
 	// ProtocolID is the ID for E2C Protocol
-	ProtocolID = "e2c/e2c/0.0.1"
+	ProtocolID = "synchs/synchs/0.0.1"
 	// ProtocolMsgBuffer defines how many protocol messages can be buffered
 	ProtocolMsgBuffer = 100
 )
@@ -58,14 +58,25 @@ func (shs *SyncHS) Setup(n *net.Network) error {
 	shs.pendingCommands = make(map[crypto.Hash]*chain.Command)
 	shs.timerMaps = make(map[uint64]*util.Timer)
 	shs.blameMap = make(map[uint64]map[uint64]*msg.Blame)
+	shs.certMap = make(map[uint64]*msg.BlockCertificate)
 
 	// Setup channels
 	shs.msgChannel = make(chan *msg.SyncHSMsg, ProtocolMsgBuffer)
 	shs.cmdChannel = make(chan *chain.Command, ProtocolMsgBuffer)
+	shs.voteChannel = make(chan *msg.Vote, ProtocolMsgBuffer)
 
 	// Obtain a new chain
 	shs.bc = chain.NewChain()
 	// TODO: create a new chain only if no chain is present in the data directory
+
+	// Setup certificate for the first block
+	genesisCert := &msg.BlockCertificate{
+		BCert: &msg.Certificate{},
+		Data:  &msg.VoteData{},
+	}
+	genesisCert.Data.View = shs.view
+	genesisCert.Data.Block = chain.GetGenesis()
+	shs.certMap[0] = genesisCert
 
 	// How to react to Protocol Messages
 	shs.host.SetStreamHandler(ProtocolID, shs.ProtoMsgHandler)
@@ -106,7 +117,9 @@ func (shs *SyncHS) Setup(n *net.Network) error {
 
 // Start implements the Protocol Interface
 func (shs *SyncHS) Start() {
-	// Concurrently handle commands
+	// First, start vote handler concurrently
+	go shs.voteHandler()
+	// Then start command handler concurrently
 	go shs.cmdHandler()
 	// Start E2C Protocol - Start message handler
 	shs.protocol()

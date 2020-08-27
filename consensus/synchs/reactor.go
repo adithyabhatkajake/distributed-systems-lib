@@ -6,7 +6,7 @@ import (
 	pb "github.com/golang/protobuf/proto"
 )
 
-func (shs *SyncHS) react(m []byte) {
+func (n *SyncHS) react(m []byte) {
 	log.Trace("Received a message of size", len(m))
 	inMessage := &msg.SyncHSMsg{}
 	err := pb.Unmarshal(m, inMessage)
@@ -14,13 +14,13 @@ func (shs *SyncHS) react(m []byte) {
 		log.Error("Received an invalid protocol message", err)
 		return
 	}
-	shs.msgChannel <- inMessage
+	n.msgChannel <- inMessage
 }
 
-func (shs *SyncHS) protocol() {
+func (n *SyncHS) protocol() {
 	// Process protocol messages
 	for {
-		msgIn, ok := <-shs.msgChannel
+		msgIn, ok := <-n.msgChannel
 		if !ok {
 			log.Error("Msg channel error")
 		}
@@ -31,17 +31,20 @@ func (shs *SyncHS) protocol() {
 			cmd := msgIn.GetCmd()
 			log.Trace("Cmd is:", string(cmd.Cmd))
 			// Everyone adds cmd to pending commands
-			shs.cmdChannel <- cmd
+			n.cmdChannel <- cmd
 		case *msg.SyncHSMsg_Prop:
 			prop := msgIn.GetProp()
 			log.Trace("Received a propoal from", prop.ProposedBlock.Proposer)
-			go shs.handleProposal(prop)
+			go n.handleProposal(prop)
 		case *msg.SyncHSMsg_Npblame:
 			blMsg := msgIn.GetNpblame()
-			go shs.handleNoProgressBlame(blMsg)
+			go n.handleNoProgressBlame(blMsg)
 		case *msg.SyncHSMsg_Eqblame:
 			_ = msgIn.GetEqblame()
 			// TODO
+		case *msg.SyncHSMsg_Vote:
+			vote := msgIn.GetVote()
+			n.voteChannel <- vote
 		case nil:
 			log.Warn("Unspecified type")
 		default:
@@ -50,9 +53,9 @@ func (shs *SyncHS) protocol() {
 	}
 }
 
-func (shs *SyncHS) cmdHandler() {
+func (n *SyncHS) cmdHandler() {
 	for {
-		cmd, ok := <-shs.cmdChannel
+		cmd, ok := <-n.cmdChannel
 		if !ok {
 			log.Error("Command Channel error")
 		}
@@ -60,31 +63,31 @@ func (shs *SyncHS) cmdHandler() {
 		h := cmd.GetHash()
 		var exists bool
 		log.Trace("Trying to acquire cmdMutex lock")
-		shs.cmdMutex.Lock()
+		n.cmdMutex.Lock()
 		log.Trace("Acquired cmdMutex lock")
 		// If this is the first command, start the blame timer
 		log.Trace("Checking if we are adding a command to an empty pendingCommmads buffer")
-		if len(shs.pendingCommands) == 0 {
+		if len(n.pendingCommands) == 0 {
 			log.Debug("First command received. Starting Blame timer")
-			go shs.startBlameTimer()
+			go n.startBlameTimer()
 		}
 		log.Trace("Adding command to pending commands buffer")
 		// Add cmd to pending commands
-		_, exists = shs.pendingCommands[h]
+		_, exists = n.pendingCommands[h]
 		if !exists {
-			shs.pendingCommands[h] = cmd
+			n.pendingCommands[h] = cmd
 		}
-		shs.cmdMutex.Unlock()
+		n.cmdMutex.Unlock()
 		// We already received this command once, skip
 		if exists {
 			continue
 		}
 		log.Trace("Added command to pending commands")
 		// I am not the leader, skip the rest
-		if shs.leader != shs.config.GetID() {
+		if n.leader != n.config.GetID() {
 			continue
 		}
 		// If I am the leader, then propose
-		go shs.propose()
+		go n.propose()
 	}
 }

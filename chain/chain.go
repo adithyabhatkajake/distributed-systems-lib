@@ -14,6 +14,7 @@ func NewChain() *BlockChain {
 	// Set genesis block as the first block
 	c.HeightBlockMap[genesis.Data.Index] = genesis
 	c.Chain[genesis.GetHash()] = genesis
+	c.Head = 0
 
 	return c
 }

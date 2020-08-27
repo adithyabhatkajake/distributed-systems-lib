@@ -56,8 +56,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	nReplicas = *optNumReplica
-	nFaulty = *optNumFaulty
+	if nReplicas == *optNumReplica {
+		nFaulty = *optNumFaulty
+	} else {
+		nReplicas = *optNumReplica
+		tempFaulty := uint64((nReplicas - 1) / 2)
+		if *optNumFaulty < tempFaulty {
+			nFaulty = *optNumFaulty
+		} else {
+			nFaulty = tempFaulty
+		}
+	}
 	blkSize = *optBlockSize
 	delta = float64(*optDelay) / 1000.0
 	basePort = *optBasePort
@@ -111,6 +120,7 @@ func main() {
 		nodeMap[i].ProtConfig.Delta = delta
 		nodeMap[i].ProtConfig.Info = &e2cconfig.ProtoInfo{}
 		nodeMap[i].ProtConfig.Info.NodeSize = nReplicas
+		nodeMap[i].ProtConfig.Info.Faults = nFaulty
 		nodeMap[i].ProtConfig.Info.BlockSize = blkSize
 	}
 

@@ -4,6 +4,7 @@ package msg ;
 option go_package = "github.com/adithyabhatkajake/libe2c/msg/synchs" ;
 
 import "synchs/msg/proposal.proto" ;
+import "synchs/msg/cert.proto" ;
 
 message BlameData {
 	uint64 blameTarget = 1 ; // Who are we blaming?
@@ -14,11 +15,6 @@ message Blame {
 	BlameData BlData = 1 ; 
 	uint64 BlOrigin = 2 ; // Who is sending the blame
 	bytes signature = 3 ;
-}
-
-message Certificate {
-	repeated bytes signatures = 1;
-	repeated uint64 ids = 2 ;
 }
 
 message NoProgressBlame {
@@ -32,5 +28,5 @@ message EquivocationBlame {
 }
 
 message QuitView {
-	Certificate BlCert = 1 ;
+	msg.Certificate BlCert = 1 ;
 }
