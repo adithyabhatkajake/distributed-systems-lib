@@ -3,7 +3,7 @@ package secp256k1
 import (
 	"crypto/rand"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libchatter/crypto"
 	underlyingSecp256k1 "github.com/libp2p/go-libp2p-core/crypto"
 )
 

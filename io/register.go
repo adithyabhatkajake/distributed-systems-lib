@@ -1,8 +1,8 @@
 package io
 
 import (
-	"github.com/adithyabhatkajake/libe2c/crypto"
-	secp256k1 "github.com/adithyabhatkajake/libe2c/crypto/secp256k1"
+	"github.com/adithyabhatkajake/libchatter/crypto"
+	secp256k1 "github.com/adithyabhatkajake/libchatter/crypto/secp256k1"
 )
 
 // regsiter all contexts

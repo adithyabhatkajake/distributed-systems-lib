@@ -3,7 +3,7 @@ package bench_test
 import (
 	"testing"
 
-	"github.com/adithyabhatkajake/libe2c/crypto/secp256k1"
+	"github.com/adithyabhatkajake/libchatter/crypto/secp256k1"
 )
 
 func BenchmarkSign(b *testing.B) {

@@ -3,7 +3,7 @@ package chain
 import (
 	"sync"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libchatter/crypto"
 )
 
 // BlockChain is what we call a blockchain

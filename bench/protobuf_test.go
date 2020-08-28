@@ -3,7 +3,7 @@ package bench_test
 import (
 	"testing"
 
-	"github.com/adithyabhatkajake/libe2c/chain"
+	"github.com/adithyabhatkajake/libchatter/chain"
 	pb "github.com/golang/protobuf/proto"
 )
 

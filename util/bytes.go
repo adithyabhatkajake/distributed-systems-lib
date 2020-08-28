@@ -3,7 +3,7 @@ package util
 import (
 	"encoding/hex"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libchatter/crypto"
 )
 
 // StringToByte converts a string into a byte array

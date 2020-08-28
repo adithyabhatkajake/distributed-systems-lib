@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/adithyabhatkajake/libe2c/util"
+	"github.com/adithyabhatkajake/libchatter/util"
 )
 
 // Check if the correct callback is called after the time

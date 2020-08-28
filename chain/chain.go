@@ -1,6 +1,6 @@
 package chain
 
-import "github.com/adithyabhatkajake/libe2c/crypto"
+import "github.com/adithyabhatkajake/libchatter/crypto"
 
 // NewChain returns an empty chain
 func NewChain() *BlockChain {

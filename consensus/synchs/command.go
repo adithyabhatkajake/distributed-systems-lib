@@ -148,7 +148,9 @@ func (n *SyncHS) cmdHandler() {
 				return
 			}
 			log.Trace("Received a proposal - Sync")
-			certMap[prop.ProposedBlock.Data.Index] = prop.Cert
+			if _, exists := certMap[prop.ProposedBlock.Data.Index]; !exists {
+				certMap[prop.ProposedBlock.Data.Index] = prop.Cert
+			}
 		}
 	}
 }

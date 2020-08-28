@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/adithyabhatkajake/libe2c/crypto/secp256k1"
+	"github.com/adithyabhatkajake/libchatter/crypto/secp256k1"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"

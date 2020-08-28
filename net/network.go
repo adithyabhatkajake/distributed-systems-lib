@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adithyabhatkajake/libe2c/log"
+	"github.com/adithyabhatkajake/libchatter/log"
 
-	"github.com/adithyabhatkajake/libe2c/config"
-	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libchatter/config"
+	"github.com/adithyabhatkajake/libchatter/crypto"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"

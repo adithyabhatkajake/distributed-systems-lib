@@ -1,8 +1,8 @@
 package consensus
 
 import (
-	"github.com/adithyabhatkajake/libe2c/config"
-	"github.com/adithyabhatkajake/libe2c/net"
+	"github.com/adithyabhatkajake/libchatter/config"
+	"github.com/adithyabhatkajake/libchatter/net"
 )
 
 /* This consensus algorithm just sends everybody a message and exits */
