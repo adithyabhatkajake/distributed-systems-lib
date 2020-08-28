@@ -1,4 +1,4 @@
-module github.com/adithyabhatkajake/libe2c
+module github.com/adithyabhatkajake/libchatter
 
 go 1.14
 
