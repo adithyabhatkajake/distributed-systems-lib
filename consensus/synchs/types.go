@@ -5,7 +5,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
 	"github.com/adithyabhatkajake/libe2c/util"
 
 	chain "github.com/adithyabhatkajake/libe2c/chain"
@@ -31,30 +30,30 @@ type SyncHS struct {
 	// A map of node ID to its corresponding RW stream
 	streamMap map[uint64]*bufio.ReadWriter
 	// A map of hash to pending commands
-	pendingCommands map[crypto.Hash]*chain.Command
+	// pendingCommands map[crypto.Hash]*chain.Command
 	// A mapping between the block number to its commit timer
 	timerMaps map[uint64]*util.Timer
 	// Certificate map
-	certMap map[uint64]*msg.BlockCertificate
+	// certMap map[uint64]*msg.BlockCertificate
 	// A mapping between the view and (A mapping between the origin and blames against the leader)
 	blameMap map[uint64]map[uint64]*msg.Blame
 
 	/* Locks - We separate all the locks, so that acquiring
 	one lock does not make other goroutines stop */
-	peerMapLock sync.RWMutex // The lock to modify
-	cliMutex    sync.RWMutex // The lock to modify cliMap
-	netMutex    sync.RWMutex // The lock to modify streamMap
-	cmdMutex    sync.RWMutex // The lock to modify pendingCommands
+	cliMutex sync.RWMutex // The lock to modify cliMap
+	netMutex sync.RWMutex // The lock to modify streamMap: Use mutex when using network streams to talk to other nodes
+	// cmdMutex    sync.RWMutex // The lock to modify pendingCommands
 	timerLock   sync.RWMutex // The lock to modify timerMaps
 	blTimerLock sync.RWMutex // The lock to modify blTimer
 	blLock      sync.RWMutex // The lock to modify blameMap
-	certMapLock sync.RWMutex // The lock to modify certMap
+	// certMapLock sync.RWMutex // The lock to modify certMap
 
 	// Channels
-	msgChannel  chan *msg.SyncHSMsg
-	cmdChannel  chan *chain.Command
-	voteChannel chan *msg.Vote
-	errCh       chan error
+	msgChannel     chan *msg.SyncHSMsg // All messages come here first
+	cmdChannel     chan *chain.Command // All commands are re-directed here
+	voteChannel    chan *msg.Vote      // All votes are sent here
+	proposeChannel chan *msg.Proposal  // All proposals are sent here
+	errCh          chan error          // All errors are sent here
 
 	// Block chain
 	bc *chain.BlockChain
@@ -64,4 +63,5 @@ type SyncHS struct {
 	view    uint64
 	config  *config.NodeConfig
 	blTimer *util.Timer
+	syncObj syncT
 }

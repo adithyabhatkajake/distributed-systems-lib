@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/adithyabhatkajake/libe2c/chain"
-	"github.com/adithyabhatkajake/libe2c/crypto"
 	"github.com/adithyabhatkajake/libe2c/log"
 	"github.com/adithyabhatkajake/libe2c/util"
 
@@ -55,10 +54,10 @@ func (shs *SyncHS) Setup(n *net.Network) error {
 	shs.pMap = n.PeerMap
 	shs.streamMap = make(map[uint64]*bufio.ReadWriter)
 	shs.cliMap = make(map[*bufio.ReadWriter]bool)
-	shs.pendingCommands = make(map[crypto.Hash]*chain.Command)
+	// shs.pendingCommands = make(map[crypto.Hash]*chain.Command)
 	shs.timerMaps = make(map[uint64]*util.Timer)
 	shs.blameMap = make(map[uint64]map[uint64]*msg.Blame)
-	shs.certMap = make(map[uint64]*msg.BlockCertificate)
+	// shs.certMap = make(map[uint64]*msg.BlockCertificate)
 
 	// Setup channels
 	shs.msgChannel = make(chan *msg.SyncHSMsg, ProtocolMsgBuffer)
@@ -68,15 +67,6 @@ func (shs *SyncHS) Setup(n *net.Network) error {
 	// Obtain a new chain
 	shs.bc = chain.NewChain()
 	// TODO: create a new chain only if no chain is present in the data directory
-
-	// Setup certificate for the first block
-	genesisCert := &msg.BlockCertificate{
-		BCert: &msg.Certificate{},
-		Data:  &msg.VoteData{},
-	}
-	genesisCert.Data.View = shs.view
-	genesisCert.Data.Block = chain.GetGenesis()
-	shs.certMap[0] = genesisCert
 
 	// How to react to Protocol Messages
 	shs.host.SetStreamHandler(ProtocolID, shs.ProtoMsgHandler)

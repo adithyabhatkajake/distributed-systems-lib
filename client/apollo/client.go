@@ -10,13 +10,14 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/adithyabhatkajake/libe2c/config/apollo"
 	"github.com/adithyabhatkajake/libe2c/log"
-	"github.com/adithyabhatkajake/libe2c/util"
 
 	"github.com/adithyabhatkajake/libe2c/chain"
 	consensus "github.com/adithyabhatkajake/libe2c/consensus/apollo"
@@ -37,25 +38,31 @@ var (
 	BufferCommands = uint64(10)
 	// PendingCommands tells how many commands we are waiting
 	// for acknowledgements from replicas
-	PendingCommands = uint64(0)
-	cmdMutex        = &sync.Mutex{}
-	streamMutex     = &sync.Mutex{}
-	voteMutex       = &sync.Mutex{}
-	condLock        = &sync.Mutex{}
-	cond            = sync.NewCond(condLock)
-	voteChannel     chan *msg.CommitAck
-	idMap           = make(map[string]uint64)
-	votes           = make(map[crypto.Hash]uint64)
-	f               uint64
+	PendingCommands  = uint64(0)
+	cmdMutex         = &sync.Mutex{}
+	streamMutex      = &sync.Mutex{}
+	voteMutex        = &sync.Mutex{}
+	condLock         = &sync.RWMutex{}
+	voteChannel      chan *msg.CommitAck
+	idMap            = make(map[string]uint64)
+	votes            = make(map[crypto.Hash]uint64)
+	timeMap          = make(map[crypto.Hash]time.Time)
+	commitTimeMetric = make(map[crypto.Hash]time.Duration)
+	f                uint64
+	metricCount      = uint64(5)
 )
 
 func sendCommandToServer(cmd *msg.ApolloMsg, rwMap map[uint64]*bufio.Writer) {
 	log.Trace("Processing Command")
+	cmdHash := cmd.GetCmd().GetHash()
 	data, err := pb.Marshal(cmd)
 	if err != nil {
 		log.Error("Marshaling error", err)
 		return
 	}
+	condLock.Lock()
+	timeMap[cmdHash] = time.Now()
+	condLock.Unlock()
 	// Ship command off to the nodes
 	for idx, rw := range rwMap {
 		streamMutex.Lock()
@@ -115,30 +122,61 @@ func handleVotes(cmdChannel chan *msg.ApolloMsg, rwMap map[uint64]*bufio.Writer)
 		// To ensure this is executed only once, check old committed state
 		old := commitMap[cmdHash]
 		if voteMap[cmdHash] > f {
-			log.Info("Confirmed commit for command ",
-				util.HashToString(cmdHash))
+			condLock.Lock()
+			commitTimeMetric[cmdHash] = time.Since(timeMap[cmdHash])
+			condLock.Unlock()
 			commitMap[cmdHash] = true
 		}
 		new := commitMap[cmdHash]
 		// If we commit the block for the first time, then ship off a new command to the server
 		if old != new {
 			cmd := <-cmdChannel
-			log.Info("Sending command ", cmd, " to the servers")
+			// log.Info("Sending command ", cmd, " to the servers")
 			go sendCommandToServer(cmd, rwMap)
 		}
 	}
 }
 
+func printMetrics() {
+	printDuration, err := time.ParseDuration("60s")
+	if err != nil {
+		panic(err)
+	}
+	var count int64 = 0
+	for i := uint64(0); i < metricCount; i++ {
+		<-time.After(printDuration)
+		condLock.RLock()
+		num := 0
+		for _, dur := range commitTimeMetric {
+			num++
+			count += dur.Milliseconds()
+		}
+		fmt.Println("Metric")
+		fmt.Printf("%d cmds in %d milliseconds\n", num, count)
+		condLock.RUnlock()
+	}
+	os.Exit(0)
+}
+
 func main() {
+	confFile := flag.String("conf", "", "Path to client config file")
+	batch := flag.Uint64("batch", BufferCommands, "Number of commands to wait for")
+	count := flag.Uint64("metric", metricCount, "Number of metrics to collect before exiting")
 	// Setup Logger
 	log.SetLevel(log.InfoLevel)
 
 	log.Info("I am the client")
 	ctx := context.Background()
 
+	flag.Parse()
+
+	// Set values based on command line arguments
+	BufferCommands = *batch
+	metricCount = *count
+
 	// Get client config
 	confData := &apollo.ClientConfig{}
-	e2cio.ReadFromFile(confData, os.Args[1])
+	e2cio.ReadFromFile(confData, *confFile)
 
 	f = confData.Config.Info.Faults
 	// Start networking stack
@@ -219,9 +257,11 @@ func main() {
 			Cmd: cmd,
 		}
 
-		log.Info("Sending command ", idx, " to the servers")
+		// log.Info("Sending command ", idx, " to the servers")
 		go sendCommandToServer(cmdMsg, rwMap)
 	}
+
+	go printMetrics()
 
 	// Make sure we always fill the channel with commands
 

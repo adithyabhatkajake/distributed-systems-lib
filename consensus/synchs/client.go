@@ -19,6 +19,7 @@ func (shs *SyncHS) ClientMsgHandler(s network.Stream) {
 	// A buffer to collect messages
 	buf := make([]byte, msg.MaxMsgSize)
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+	// Add new client to cliMap
 	shs.cliMutex.Lock()
 	shs.cliMap[rw] = true
 	shs.cliMutex.Unlock()
@@ -27,23 +28,18 @@ func (shs *SyncHS) ClientMsgHandler(s network.Stream) {
 		// Receive a message from a client and process them
 		len, err := rw.Read(buf)
 		if err != nil {
-			shs.errCh <- err
 			log.Error("Error receiving a message from the client-", err)
 			// Remove rw from cliMap after disconnection
 			shs.cliMutex.Lock()
-			_, exists := shs.cliMap[rw]
-			// Delete only if it is in the map
-			if exists {
-				delete(shs.cliMap, rw)
-			}
+			delete(shs.cliMap, rw)
 			shs.cliMutex.Unlock()
 			return
 		}
 		// Send a copy for reacting
 		msgBuf := make([]byte, len)
 		copy(msgBuf, buf[0:len])
-		// React concurrently
-		go shs.react(msgBuf)
+		// React parses the message and sends it to msgChannel if valid
+		shs.react(msgBuf)
 	}
 }
 

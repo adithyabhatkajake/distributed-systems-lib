@@ -51,7 +51,6 @@ type Apollo struct {
 
 	/* Locks - We separate all the locks, so that acquiring
 	one lock does not make other goroutines stop */
-	peerMapLock sync.RWMutex // The lock to modify
 	cliMutex    sync.RWMutex // The lock to modify cliMap
 	netMutex    sync.RWMutex // The lock to modify streamMap
 	cmdMutex    sync.RWMutex // The lock to modify pendingCommands

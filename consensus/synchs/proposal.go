@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/adithyabhatkajake/libe2c/chain"
-	"github.com/adithyabhatkajake/libe2c/crypto"
 	"github.com/adithyabhatkajake/libe2c/log"
 	msg "github.com/adithyabhatkajake/libe2c/msg/synchs"
 	"github.com/adithyabhatkajake/libe2c/util"
@@ -13,75 +12,27 @@ import (
 )
 
 // Monitor pending commands, if there is any change and the current node is the leader, then start proposing blocks
-func (n *SyncHS) propose() {
+func (n *SyncHS) propose(prop *msg.Proposal, pIdx uint64) {
 	log.Trace("Starting a propose step")
-	// If there are sufficient commands in pendingCommands, then propose
-	n.cmdMutex.Lock()
-	blkSize := n.config.GetBlockSize()
-	// Insufficient commands to make a block
-	if uint64(len(n.pendingCommands)) < blkSize {
-		n.cmdMutex.Unlock()
-		return
-	}
-	// We have sufficient blocks by now
-	// Do we have a certificate for the previous block?
-	n.bc.ChainLock.Lock()
-	_, exists := n.certMap[n.bc.Head]
-	n.bc.ChainLock.Unlock()
-	if !exists {
-		n.cmdMutex.Unlock()
-		log.Debug("No certificate for head found. Aborting proposal")
-		return
-	}
-	// We have certificate for the head and also sufficient commands
-	// Start building the block
-	var cmds []*chain.Command = make([]*chain.Command, blkSize)
-	var hashesToRemove []crypto.Hash = make([]crypto.Hash, blkSize)
-	var idx = 0
-	// First copy the commands onto an array
-	for h, cmd := range n.pendingCommands {
-		cmds[idx] = cmd
-		hashesToRemove[idx] = h
-		idx++
-		// Stop early if we have collected sufficient commands to make a block
-		if uint64(idx) == blkSize {
-			break
-		}
-	}
-	// Now remove them from the map
-	for _, h := range hashesToRemove {
-		delete(n.pendingCommands, h)
-	}
-	// Others can freely mutate the pending commands now, we are done with it
-	n.cmdMutex.Unlock()
-
-	prop := &msg.Proposal{}
-	blk := NewBlock(cmds)
-	blk.Proposer = n.config.GetID()
+	prop.ProposedBlock.Proposer = n.config.GetID()
+	prop.ProposedBlock.Data.Index = pIdx
 	// We are mutating the chain, acquire the lock first
 	{
 		n.bc.ChainLock.Lock()
-		n.certMapLock.RLock()
-		// Set index
-		blk.Data.Index = n.bc.Head + 1
 		// Set previous hash to the current head
-		blk.Data.PrevHash = n.bc.HeightBlockMap[n.bc.Head].GetBlockHash()
-		prop.Cert = n.certMap[n.bc.Head]
-		// Increment chain head for future proposals
-		n.bc.Head++
+		prop.ProposedBlock.Data.PrevHash = n.bc.HeightBlockMap[pIdx-1].GetBlockHash()
 		// Set old head, so that parallel proposals have the correct prevHash
-		n.bc.HeightBlockMap[n.bc.Head] = blk
+		n.bc.HeightBlockMap[pIdx] = prop.ProposedBlock
 		// Set Hash
-		blk.BlockHash = blk.GetHash().GetBytes()
+		prop.ProposedBlock.BlockHash = prop.ProposedBlock.GetHash().GetBytes()
 		// Set unconfirmed Blocks
-		n.bc.UnconfirmedBlocks[blk.GetHashBytes()] = blk
+		n.bc.UnconfirmedBlocks[prop.ProposedBlock.GetHashBytes()] = prop.ProposedBlock
 		// e.bc.HeightBlockMap[e.bc.head] = blk
 		// The chain is free for mutation from others now
-		n.certMapLock.RUnlock()
 		n.bc.ChainLock.Unlock()
 	}
 	// Sign
-	data, err := pb.Marshal(blk.Data)
+	data, err := pb.Marshal(prop.ProposedBlock.Data)
 	if err != nil {
 		log.Error("Error in marshalling block data during proposal")
 		panic(err)
@@ -91,23 +42,23 @@ func (n *SyncHS) propose() {
 		log.Error("Error in signing a block during proposal")
 		panic(err)
 	}
-	blk.Signature = sig
+	prop.ProposedBlock.Signature = sig
 	prop.View = n.view
-	prop.ProposedBlock = blk
 	log.Trace("Finished Proposing")
 	// Ship proposal to processing
 
 	relayMsg := &msg.SyncHSMsg{}
 	relayMsg.Msg = &msg.SyncHSMsg_Prop{Prop: prop}
-	n.Broadcast(relayMsg) // Leader sends new block to all the other nodes
+	// Leader sends new block to all the other nodes
+	go n.Broadcast(relayMsg)
 	// Leader should also vote
-	n.voteForBlock(blk)
+	go n.voteForBlock(prop.ProposedBlock)
 	// Start 2\delta timer
-	n.startBlockTimer(prop.ProposedBlock)
+	go n.startBlockTimer(prop.ProposedBlock)
 }
 
 // Deal with the proposal
-func (n *SyncHS) handleProposal(prop *msg.Proposal) {
+func (n *SyncHS) proposeHandler(prop *msg.Proposal) {
 	log.Trace("Handling proposal", prop.ProposedBlock.Data.Index)
 	if !prop.ProposedBlock.IsValid() {
 		log.Warn("Invalid block")
@@ -161,48 +112,18 @@ func (n *SyncHS) handleProposal(prop *msg.Proposal) {
 	}
 	n.addNewBlock(prop.ProposedBlock)
 	n.ensureBlockIsDelivered(prop.ProposedBlock)
-
-	// Remove cmds proposed from pending commands
-	n.cmdMutex.Lock()
-	for _, cmd := range prop.ProposedBlock.Data.Cmds {
-		h := cmd.GetHash()
-		delete(n.pendingCommands, h)
-	}
-	n.cmdMutex.Unlock()
+	// Send the proposal to syncer, so that it can remove the candidate blocks and proposals
+	go func() {
+		n.syncObj.propChannel <- prop
+	}()
 	// Vote for the proposal
-	n.voteForBlock(prop.ProposedBlock)
+	go n.voteForBlock(prop.ProposedBlock)
 	// Start 2\delta timer
-	n.startBlockTimer(prop.ProposedBlock)
+	go n.startBlockTimer(prop.ProposedBlock)
 	// Stop blame timer, since we got a valid proposal
 	// During commit, if pending commands is empty, we will restart the blame timer
 	go n.stopBlameTimer()
-}
 
-func (n *SyncHS) voteForBlock(blk *chain.Block) {
-	v := &msg.Vote{}
-	v.Origin = n.config.GetID()
-	v.Data = &msg.VoteData{}
-	v.Data.Block = blk
-	v.Data.View = n.view
-	data, err := pb.Marshal(v.Data)
-	if err != nil {
-		log.Error("Error marshing vote data during voting")
-		log.Error(err)
-		return
-	}
-	v.Signature, err = n.config.GetMyKey().Sign(data)
-	if err != nil {
-		log.Error("Error signing vote")
-		log.Error(err)
-		return
-	}
-	voteMsg := &msg.SyncHSMsg{}
-	voteMsg.Msg = &msg.SyncHSMsg_Vote{Vote: v}
-	n.Broadcast(voteMsg) // Send vote to all the nodes
-	// Handle my own vote
-	go func() {
-		n.voteChannel <- v
-	}()
 }
 
 // NewBlock creates a new block from the commands received.

@@ -23,6 +23,7 @@ func (n *SyncHS) protocol() {
 		msgIn, ok := <-n.msgChannel
 		if !ok {
 			log.Error("Msg channel error")
+			return
 		}
 		log.Trace("Received msg", msgIn.String())
 		switch x := msgIn.Msg.(type) {
@@ -34,8 +35,9 @@ func (n *SyncHS) protocol() {
 			n.cmdChannel <- cmd
 		case *msg.SyncHSMsg_Prop:
 			prop := msgIn.GetProp()
-			log.Trace("Received a propoal from", prop.ProposedBlock.Proposer)
-			go n.handleProposal(prop)
+			log.Trace("Received a proposal from ", prop.ProposedBlock.Proposer)
+			// Send proposal to propose handler
+			go n.proposeHandler(prop)
 		case *msg.SyncHSMsg_Npblame:
 			blMsg := msgIn.GetNpblame()
 			go n.handleNoProgressBlame(blMsg)
@@ -46,48 +48,9 @@ func (n *SyncHS) protocol() {
 			vote := msgIn.GetVote()
 			n.voteChannel <- vote
 		case nil:
-			log.Warn("Unspecified type")
+			log.Warn("Unspecified msg type", x)
 		default:
-			log.Warn("Unknown type", x)
+			log.Warn("Unknown msg type", x)
 		}
-	}
-}
-
-func (n *SyncHS) cmdHandler() {
-	for {
-		cmd, ok := <-n.cmdChannel
-		if !ok {
-			log.Error("Command Channel error")
-		}
-		log.Trace("Handling command:", cmd.String())
-		h := cmd.GetHash()
-		var exists bool
-		log.Trace("Trying to acquire cmdMutex lock")
-		n.cmdMutex.Lock()
-		log.Trace("Acquired cmdMutex lock")
-		// If this is the first command, start the blame timer
-		log.Trace("Checking if we are adding a command to an empty pendingCommmads buffer")
-		if len(n.pendingCommands) == 0 {
-			log.Debug("First command received. Starting Blame timer")
-			go n.startBlameTimer()
-		}
-		log.Trace("Adding command to pending commands buffer")
-		// Add cmd to pending commands
-		_, exists = n.pendingCommands[h]
-		if !exists {
-			n.pendingCommands[h] = cmd
-		}
-		n.cmdMutex.Unlock()
-		// We already received this command once, skip
-		if exists {
-			continue
-		}
-		log.Trace("Added command to pending commands")
-		// I am not the leader, skip the rest
-		if n.leader != n.config.GetID() {
-			continue
-		}
-		// If I am the leader, then propose
-		go n.propose()
 	}
 }
