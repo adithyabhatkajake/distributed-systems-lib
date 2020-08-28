@@ -7,8 +7,8 @@ import (
 	// To use require
 	"github.com/stretchr/testify/require"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
-	"github.com/adithyabhatkajake/libe2c/crypto/secp256k1"
+	"github.com/adithyabhatkajake/libchatter/crypto"
+	"github.com/adithyabhatkajake/libchatter/crypto/secp256k1"
 )
 
 var (

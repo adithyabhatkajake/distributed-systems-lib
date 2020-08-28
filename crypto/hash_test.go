@@ -6,8 +6,8 @@ import (
 	// To use require
 	"github.com/stretchr/testify/require"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
-	"github.com/adithyabhatkajake/libe2c/util"
+	"github.com/adithyabhatkajake/libchatter/crypto"
+	"github.com/adithyabhatkajake/libchatter/util"
 )
 
 const (

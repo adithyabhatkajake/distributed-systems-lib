@@ -1,7 +1,7 @@
 syntax = "proto3" ;
 package config ;
 
-option go_package = "github.com/adithyabhatkajake/libe2c/config" ;
+option go_package = "github.com/adithyabhatkajake/libchatter/config" ;
 
 message Address {
     string IP = 1 ;

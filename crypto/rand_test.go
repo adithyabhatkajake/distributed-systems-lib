@@ -5,7 +5,7 @@ import (
 	// To use require
 	"github.com/stretchr/testify/require"
 
-	"github.com/adithyabhatkajake/libe2c/crypto"
+	"github.com/adithyabhatkajake/libchatter/crypto"
 )
 
 /* This test checks for the following:*/

@@ -1,4 +1,4 @@
-PROTO_PATH=/home/haxolotl/go/src/github.com/adithyabhatkajake/libe2c/proto
+PROTO_PATH=/home/haxolotl/go/src/github.com/adithyabhatkajake/libchatter/proto
 GO_OUT_DIR=/home/haxolotl/go/src/
 
 # Reference on how to use $^, $? and other automatic variables

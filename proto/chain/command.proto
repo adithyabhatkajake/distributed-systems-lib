@@ -1,7 +1,7 @@
 syntax = "proto3" ;
 package chain ;
 
-option go_package = "github.com/adithyabhatkajake/libe2c/chain" ;
+option go_package = "github.com/adithyabhatkajake/libchatter/chain" ;
 
 message Command {
 	bytes cmd = 1;
