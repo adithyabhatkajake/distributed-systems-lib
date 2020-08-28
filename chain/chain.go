@@ -18,11 +18,3 @@ func NewChain() *BlockChain {
 
 	return c
 }
-
-// Commit takes a block and commits to it
-func (c *BlockChain) Commit(b *Block) error {
-	c.ChainLock.Lock()
-	// TODO do commit
-	c.ChainLock.Unlock()
-	return nil
-}

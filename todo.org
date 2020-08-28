@@ -1,3 +1,0 @@
-#+TITLE: Things to do
-
-* Modules to Implement

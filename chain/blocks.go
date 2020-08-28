@@ -18,9 +18,7 @@ func (b *Block) GetHash() crypto.Hash {
 
 // GetHashBytes returns crypto.Hash from []bytes
 func (b *Block) GetHashBytes() crypto.Hash {
-	var x crypto.Hash
-	copy(x[:], b.BlockHash)
-	return x
+	return crypto.ToHash(b.GetBlockHash())
 }
 
 // IsValid checks if the block is valid
