@@ -3,9 +3,9 @@ module github.com/adithyabhatkajake/libchatter
 go 1.14
 
 require (
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.4.0
-	github.com/joho/godotenv v1.3.0
+	github.com/joho/godotenv v1.3.0 // indirect
 	github.com/libp2p/go-libp2p v0.10.0
 	github.com/libp2p/go-libp2p-core v0.6.0
 	github.com/multiformats/go-multiaddr v0.2.2
@@ -14,6 +14,7 @@ require (
 	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/tools v0.0.0-20200103221440-774c71fcf114 // indirect
-	google.golang.org/protobuf v1.23.0
+	google.golang.org/protobuf v1.23.0 // indirect
 	gopkg.in/yaml.v2 v2.2.5 // indirect
+	honnef.co/go/tools v0.0.1-2019.2.3 // indirect
 )
