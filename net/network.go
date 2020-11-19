@@ -21,7 +21,7 @@ var (
 	// RetryLimit specifies how many times to try dialing a node
 	RetryLimit = 30
 	// RetryWaitDuration specifies how many times to wait between each tries
-	RetryWaitDuration = "1s"
+	RetryWaitDuration = "10ms"
 )
 
 // Network contains all the networking related data structures
