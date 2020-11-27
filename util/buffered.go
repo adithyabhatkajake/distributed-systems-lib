@@ -9,8 +9,9 @@ import (
 // buffer
 func BufferedRead(reader *bufio.Reader, msgBuf []byte) (uint64, error) {
 	len := uint64(0)
-	length, err := binary.ReadUvarint(reader)
-	reader.Discard(7)
+	var lengthBuf [8]byte
+	_, err := reader.Read(lengthBuf[:])
+	length := binary.BigEndian.Uint64(lengthBuf[:])
 	if err != nil {
 		return len, err
 	}
@@ -28,15 +29,11 @@ func BufferedRead(reader *bufio.Reader, msgBuf []byte) (uint64, error) {
 // BufferedWrite writes the length first, and then writes that many bytes from
 // the buffer
 func BufferedWrite(writer *bufio.Writer, data []byte) error {
-	var lenBuf [8]byte
-	outLen := uint64(len(data))
-	binary.PutUvarint(lenBuf[:], outLen)
-	_, err := writer.Write(lenBuf[:])
-	if err != nil {
-		return err
-	}
+	var lengthBuf [8]byte
+	binary.BigEndian.PutUint64(lengthBuf[:], uint64(len(data)))
+	writer.Write(lengthBuf[:])
 	writer.Flush()
-	_, err = writer.Write(data)
+	_, err := writer.Write(data)
 	if err != nil {
 		return err
 	}
