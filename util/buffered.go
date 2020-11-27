@@ -7,7 +7,7 @@ import (
 
 // BufferedRead reads the length first, and then reads that many bytes from the
 // buffer
-func BufferedRead(reader bufio.Reader, msgBuf []byte) (uint64, error) {
+func BufferedRead(reader *bufio.Reader, msgBuf []byte) (uint64, error) {
 	var lenBuf [8]byte
 	len1, err := reader.Read(lenBuf[:])
 	len := uint64(len1)
@@ -28,7 +28,7 @@ func BufferedRead(reader bufio.Reader, msgBuf []byte) (uint64, error) {
 
 // BufferedWrite writes the length first, and then writes that many bytes from
 // the buffer
-func BufferedWrite(writer bufio.Writer, data []byte) error {
+func BufferedWrite(writer *bufio.Writer, data []byte) error {
 	var lenBuf [8]byte
 	outLen := uint64(len(data))
 	binary.PutUvarint(lenBuf[:], outLen)
