@@ -10,6 +10,7 @@ import (
 func BufferedRead(reader *bufio.Reader, msgBuf []byte) (uint64, error) {
 	len := uint64(0)
 	length, err := binary.ReadUvarint(reader)
+	reader.Discard(7)
 	if err != nil {
 		return len, err
 	}
