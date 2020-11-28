@@ -3,6 +3,7 @@ package util
 import (
 	"bufio"
 	"encoding/binary"
+	"io"
 )
 
 // BufferedRead reads the length first, and then reads that many bytes from the
@@ -10,7 +11,7 @@ import (
 func BufferedRead(reader *bufio.Reader, msgBuf []byte) (uint64, error) {
 	len := uint64(0)
 	var lengthBuf [8]byte
-	_, err := reader.Read(lengthBuf[:])
+	_, err := io.ReadFull(reader, lengthBuf[:])
 	length := binary.BigEndian.Uint64(lengthBuf[:])
 	if err != nil {
 		return len, err
